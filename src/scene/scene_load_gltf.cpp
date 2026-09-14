@@ -169,18 +169,15 @@ void Scene::loadFromGLTF(const std::string& gltfName, std::string exr_path) {
             }
         }
 
+        newMaterial.emission.emission_strength = emissive_strength;
+        newMaterial.emission.emission_color = glm::vec3(mat.emissiveFactor[0], mat.emissiveFactor[1], mat.emissiveFactor[2]);
+        newMaterial.emission.emissive_tex = mat.emissiveTexture.index;
+        parse_texture_transform(mat.emissiveTexture.extensions, newMaterial.emission.emissive_tex_transform);
+
         #if UBER_SHADER
-            newMaterial.emission.emission_strength = emissive_strength;
-            newMaterial.emission.emission_color = glm::vec3(mat.emissiveFactor[0], mat.emissiveFactor[1], mat.emissiveFactor[2]);
-            newMaterial.emission.emissive_tex = mat.emissiveTexture.index;
-            parse_texture_transform(mat.emissiveTexture.extensions, newMaterial.emission.emissive_tex_transform);
-
             newMaterial.material_type = MaterialType::Microfacet;
-            auto& albedo_tex_info = mat.pbrMetallicRoughness.baseColorTexture;
         #else
-            newMaterial.emittance = emissive_strength * glm::length(glm::vec3(mat.emissiveFactor[0], mat.emissiveFactor[1], mat.emissiveFactor[2]));
-
-            if (newMaterial.emittance > 0.01f) {
+            if (emissive_strength * glm::length(newMaterial.emission.emission_color) > EPSILON) {
                 newMaterial.material_type = MaterialType::Emissive;
                 newMaterial.color = glm::vec3(mat.emissiveFactor[0], mat.emissiveFactor[1], mat.emissiveFactor[2]);
             }
@@ -197,10 +194,9 @@ void Scene::loadFromGLTF(const std::string& gltfName, std::string exr_path) {
             else {
                 newMaterial.material_type = MaterialType::Microfacet;
             }
-
-            auto& albedo_tex_info = newMaterial.material_type == MaterialType::Emissive ? mat.emissiveTexture : mat.pbrMetallicRoughness.baseColorTexture;
         #endif
-        
+
+        auto& albedo_tex_info = mat.pbrMetallicRoughness.baseColorTexture;        
         newMaterial.albedo_tex = albedo_tex_info.index;
         parse_texture_transform(albedo_tex_info.extensions, newMaterial.albedo_tex_transform);
 

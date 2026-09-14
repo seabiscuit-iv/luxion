@@ -36,6 +36,55 @@ __device__ float envmap_pdf(glm::vec3 d, float* marginal_cdf, float* conditional
     return (sin_theta > 1e-6f) ? (p_marginal * p_conditional) / (2.0f * PI * PI * sin_theta) : 0.0f;
 }
 
+__device__ bool material_is_specular(const Material& material) {
+    #if UBER_SHADER
+        return false;
+    #else
+        return (material.material_type == MaterialType::Specular || material.material_type == MaterialType::Glass);
+    #endif
+}
+
+__device__ bool material_is_emissive(const Material& material, glm::vec3 emission) {
+    #if UBER_SHADER
+        return glm::length(emission) > EPSILON;
+    #else
+        return material.material_type == MaterialType::Emissive;
+    #endif
+}
+
+__device__ float get_pdf_bsdf(const PathSegment& path, const Material& material, const glm::vec3& dir, const glm::vec3& normal, float roughness, float metallic, const glm::vec3& materialColor) {
+    #if UBER_SHADER
+        return CookTorrance::PDF(-path.ray.direction, dir, normal, roughness, metallic, materialColor);
+    #else
+        if (material.material_type == MaterialType::Diffuse)
+        {
+            return Lambert::PDF(dir, normal);
+        }
+        else if (material.material_type == MaterialType::Microfacet)
+        {
+            return CookTorrance::PDF(-path.ray.direction, dir, normal, roughness, metallic, materialColor);
+        }
+
+        return 0.0f;
+    #endif
+}
+
+__device__ glm::vec3 get_brdf(const PathSegment& path, const Material& material, const glm::vec3& dir, const glm::vec3& normal, float roughness, float metallic, const glm::vec3& materialColor) {
+    #if UBER_SHADER
+        return CookTorrance::BRDF(-path.ray.direction, normal, dir, materialColor, roughness, metallic);
+    #else
+        if (material.material_type == MaterialType::Diffuse)
+        {
+            return materialColor / PI;
+        }
+        else if (material.material_type == MaterialType::Microfacet)
+        {
+            return CookTorrance::BRDF(-path.ray.direction, normal, dir, materialColor, roughness, metallic);
+        }
+
+        return glm::vec3(0.0f);
+    #endif
+}
 
 __global__ void shadePath(
     int iter,
@@ -87,15 +136,8 @@ __global__ void shadePath(
         float roughness = metallic_roughness.x;
         float metallic = metallic_roughness.y;
 
-        #if UBER_SHADER
-            glm::vec3 emission = get_emission(material, intersection.uvs, textures);
-        #endif
-
-        #if UBER_SHADER
-            bool is_specular = false;
-        #else
-            bool is_specular = (material.material_type == MaterialType::Specular || material.material_type == MaterialType::Glass);
-        #endif
+        glm::vec3 emission = get_emission(material, intersection.uvs, textures);
+        bool is_specular = material_is_specular(material);
 
         if (DEV_OPTIONS.material_debug_mode != 0) {
             render_material_debug_mode(
@@ -125,61 +167,29 @@ __global__ void shadePath(
             );
 
             if (DEV_OPTIONS.environment_map_importance_sampling) {
-                #if UBER_SHADER
-                if (glm::length(emission) > EPSILON) {
-                #else
-                if (material.material_type == MaterialType::Emissive) {
-                #endif
+                if (material_is_emissive(material, emission)) {
                     float mis_weight = 1.0f;
 
                     if (depth > 1 && !path.last_bounce_was_specular) {
                         float pdf_bsdf = path.last_pdf;
                         float pdf_env_of_bsdf = envmap_pdf(path.ray.direction, marginal_cdf, conditional_cdfs, exr_width, exr_height);
 
-
                         mis_weight = (pdf_bsdf * pdf_bsdf) / (pdf_bsdf * pdf_bsdf + pdf_env_of_bsdf * pdf_env_of_bsdf);
                     }
 
-                    #if UBER_SHADER
-                        path.color += path.throughput * (mis_weight * emission);
-                    #else
-                        path.color += path.throughput * (mis_weight * (material.emittance * materialColor));
-                    #endif
+                    path.color += path.throughput * (mis_weight * emission);
                     path.kill = true;
                 }
                 else {
                     if (env_map_intersesction.t < 0.0f && !is_specular && !path.kill && has_exr) {
                         glm::vec3 env_dir = path.environment_map_sample;
 
-                        float pdf_env_of_env;
-                        float pdf_bsdf_of_env;
-
-                        #if UBER_SHADER
-                            pdf_bsdf_of_env = CookTorrance::PDF(-path.ray.direction, env_dir, normal, roughness, metallic, materialColor);
-                        #else
-                            if (material.material_type == MaterialType::Diffuse) {
-                                pdf_bsdf_of_env = Lambert::PDF(env_dir, normal);
-                            }
-                            else if (material.material_type == MaterialType::Microfacet) {
-                                pdf_bsdf_of_env = CookTorrance::PDF(-path.ray.direction, env_dir, normal, roughness, metallic, materialColor);
-                            }
-                        #endif
-
-                        pdf_env_of_env = envmap_pdf(env_dir, marginal_cdf, conditional_cdfs, exr_width, exr_height);
+                        float pdf_env_of_env = envmap_pdf(env_dir, marginal_cdf, conditional_cdfs, exr_width, exr_height);
+                        float pdf_bsdf_of_env = get_pdf_bsdf(path, material, env_dir, normal, roughness, metallic, materialColor);
 
                         float mis_weight = (pdf_env_of_env * pdf_env_of_env) / (pdf_env_of_env * pdf_env_of_env + pdf_bsdf_of_env * pdf_bsdf_of_env);
 
-                        glm::vec3 brdf;
-                        #if UBER_SHADER
-                            brdf = CookTorrance::BRDF(-path.ray.direction, normal, env_dir, materialColor, roughness, metallic);
-                        #else
-                            if (material.material_type == MaterialType::Diffuse) {
-                                brdf = materialColor / PI;
-                            }
-                            else if (material.material_type == MaterialType::Microfacet) {
-                                brdf = CookTorrance::BRDF(-path.ray.direction, normal, env_dir, materialColor, roughness, metallic);
-                            }
-                        #endif
+                        glm::vec3 brdf = get_brdf(path, material, env_dir, normal, roughness, metallic, materialColor);
 
                         glm::vec3 d = glm::normalize(env_dir);
                         float phi   = atan2f(d.z, d.x);       // [-pi, pi]
@@ -201,11 +211,7 @@ __global__ void shadePath(
                 }
             }
             else if (DEV_OPTIONS.direct_light_sampling) {
-                #if UBER_SHADER
-                if (glm::length(emission) > EPSILON) {
-                #else
-                if (material.material_type == MaterialType::Emissive) {
-                #endif
+                if (material_is_emissive(material, emission)) {
                     float mis_weight = 1.0f;
 
                     if (depth > 1 && !path.last_bounce_was_specular) {
@@ -226,11 +232,7 @@ __global__ void shadePath(
                     }
 
 
-                    #if UBER_SHADER
-                        path.color += path.throughput * (mis_weight * emission);
-                    #else
-                        path.color += path.throughput * (mis_weight * (material.emittance * materialColor));
-                    #endif
+                    path.color += path.throughput * (mis_weight * emission);
                     path.kill = true;
                 } 
                 else {
@@ -250,80 +252,26 @@ __global__ void shadePath(
                             float pdf_dl_area = 1.0f / total_emissive_mesh_area;
                             float pdf_dl_sa = pdf_dl_area * (dist_sq / cosThetaLight);
 
-                            float pdf_bsdf = 0.0f;
-
-                            #if UBER_SHADER
-                                pdf_bsdf = CookTorrance::PDF(-path.ray.direction, light_dir, normal, roughness, metallic, materialColor);
-                            #else
-                                if (material.material_type == MaterialType::Diffuse) {
-                                    pdf_bsdf = Lambert::PDF(light_dir, normal);
-                                }
-                                else if (material.material_type == MaterialType::Microfacet) {
-                                    pdf_bsdf = CookTorrance::PDF(-path.ray.direction, light_dir, normal, roughness, metallic, materialColor);
-                                }
-                            #endif
+                            float pdf_bsdf = get_pdf_bsdf(path, material, light_dir, normal, roughness, metallic, materialColor);
 
                             float mis_weight = (pdf_dl_sa * pdf_dl_sa) / (pdf_dl_sa * pdf_dl_sa + pdf_bsdf * pdf_bsdf);
 
-                            glm::vec3 brdf;
-                            #if UBER_SHADER
-                                brdf = CookTorrance::BRDF(-path.ray.direction, normal, light_dir, materialColor, roughness, metallic);
-                            #else
-                                if (material.material_type == MaterialType::Diffuse) {
-                                    brdf = materialColor / PI;
-                                }
-                                else if (material.material_type == MaterialType::Microfacet) {
-                                    brdf = CookTorrance::BRDF(-path.ray.direction, normal, light_dir, materialColor, roughness, metallic);
-                                }
-                            #endif
+                            glm::vec3 brdf = get_brdf(path, material, light_dir, normal, roughness, metallic, materialColor);
 
                             int light_id = direct_light_intersection.materialId;
 
-                            #if UBER_SHADER
-                                glm::vec3 light_radiance = get_emission(materials[light_id], direct_light_intersection.uvs, textures);
-                            #else
-                                glm::vec3 light_color = materials[light_id].color;
+                            glm::vec3 light_radiance = get_emission(materials[light_id], direct_light_intersection.uvs, textures);
 
-                                if (materials[light_id].albedo_tex >= 0) {
-                                    glm::vec2 dl_uv = direct_light_intersection.uvs;
-
-                                    dl_uv *= materials[light_id].albedo_tex_transform.scale;
-
-                                    if(materials[light_id].albedo_tex_transform.rotation) {
-                                        float c = cosf(materials[light_id].albedo_tex_transform.rotation);
-                                        float s = sinf(materials[light_id].albedo_tex_transform.rotation);
-
-                                        dl_uv = glm::vec2 (
-                                            c * dl_uv.x - s * dl_uv.y,
-                                            s * dl_uv.x + c * dl_uv.y
-                                        );
-                                    }
-
-                                    dl_uv += materials[light_id].albedo_tex_transform.offset;
-
-                                    float4 tex = tex2D<float4>(textures[materials[light_id].albedo_tex].tex, dl_uv.x, dl_uv.y);
-                                    light_color = glm::pow(glm::vec3(tex.x, tex.y, tex.z), glm::vec3(2.2f));
-                                }
-
-                                glm::vec3 light_radiance = materials[light_id].emittance * light_color;
-                            #endif
                             glm::vec3 contribution = (light_radiance * brdf * cosThetaSurface) / pdf_dl_sa;
                             path.color += path.throughput * contribution * mis_weight;
                         }
                     }
                 }
             }
-            #if UBER_SHADER
-            else if (glm::length(emission) > EPSILON) {
+            else if (material_is_emissive(material, emission)) {
                 path.color += path.throughput * emission;
                 path.kill = true;
             }
-            #else
-            else if (material.material_type == MaterialType::Emissive) {
-                path.color += path.throughput * material.emittance * materialColor;
-                path.kill = true;
-            }
-            #endif
 
             if (!path.kill) {
                 update_throughput_materials(

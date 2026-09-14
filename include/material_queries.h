@@ -18,6 +18,4 @@ __device__ glm::vec3 get_normal(const Material& material, const TextureData* tex
 
 __device__ glm::vec2 get_metallic_roughness(const Material& material, glm::vec2 uv, const TextureData* textures);
 
-#if UBER_SHADER
 __device__ glm::vec3 get_emission(const Material &material, glm::vec2 uv, const TextureData *textures);
-#endif

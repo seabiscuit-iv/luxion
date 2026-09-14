@@ -101,12 +101,8 @@ void RenderImGui()
     changed |= ImGui::SliderFloat("Roughness", &app.scene->materials[PathTracerOptions::Get()->selected_material].roughness, 0.0f, 1.0f);
     changed |= ImGui::SliderFloat("Metallic", &app.scene->materials[PathTracerOptions::Get()->selected_material].metallic, 0.0f, 1.0f);
     
-    #if UBER_SHADER
-        changed |= ImGui::ColorEdit3("Emission Color", glm::value_ptr(app.scene->materials[PathTracerOptions::Get()->selected_material].emission.emission_color));
-        changed |= ImGui::SliderFloat("Emission Strength", &app.scene->materials[PathTracerOptions::Get()->selected_material].emission.emission_strength, 0.0f, 10.0f);
-    #else
-        changed |= ImGui::SliderFloat("Emittance", &app.scene->materials[PathTracerOptions::Get()->selected_material].emittance, 0.0f, 10.0f);
-    #endif
+    changed |= ImGui::ColorEdit3("Emission Color", glm::value_ptr(app.scene->materials[PathTracerOptions::Get()->selected_material].emission.emission_color));
+    changed |= ImGui::SliderFloat("Emission Strength", &app.scene->materials[PathTracerOptions::Get()->selected_material].emission.emission_strength, 0.0f, 10.0f);
 
     ImGui::End();
 

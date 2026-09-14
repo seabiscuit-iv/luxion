@@ -98,17 +98,13 @@ struct Material
     float hasReflective;
     float hasRefractive;
     float indexOfRefraction;
-
-#if UBER_SHADER
+    
     struct {
         float emission_strength = 0.0f;
         glm::vec3 emission_color;
         int emissive_tex = -1;
         TextureTransform emissive_tex_transform;
     } emission;
-#else
-    float emittance;
-#endif
 
     float roughness = 0.0f;
     float metallic = 0.0f;
