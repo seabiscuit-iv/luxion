@@ -18,6 +18,7 @@
 #include <thrust/random.h>
 
 #define M_PI 3.14159
+#define GLASS_EPSILON 0.01f
 
 __device__ float envmap_pdf(glm::vec3 d, float* marginal_cdf, float* conditional_cdfs, int W, int H) {
     float phi   = atan2f(d.z, d.x);
@@ -332,10 +333,10 @@ __global__ void shadePath(
         ray.direction = path.sample_dir;
 
         if (glm::dot(ray.direction, normal) > 0.0f) {
-            ray.origin = hit_point + (normal * EPSILON);
+            ray.origin = hit_point + (normal * GLASS_EPSILON);
         }
         else {
-            ray.origin = hit_point - (normal * EPSILON);
+            ray.origin = hit_point - (normal * GLASS_EPSILON);
         }   
     }
 }
