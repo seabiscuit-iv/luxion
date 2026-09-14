@@ -174,6 +174,17 @@ void Scene::loadFromGLTF(const std::string& gltfName, std::string exr_path) {
         newMaterial.emission.emissive_tex = mat.emissiveTexture.index;
         parse_texture_transform(mat.emissiveTexture.extensions, newMaterial.emission.emissive_tex_transform);
 
+        float ior = 1.55f;
+        if (mat.extensions.find("KHR_materials_ior") != mat.extensions.end()) {
+            const auto& ext = mat.extensions.at("KHR_materials_ior");
+
+            if (ext.Has("ior")) {
+                ior = static_cast<float>(ext.Get("ior").GetNumberAsDouble());
+            }
+        }
+
+        newMaterial.indexOfRefraction = ior;
+
         #if UBER_SHADER
             newMaterial.material_type = MaterialType::Microfacet;
         #else

@@ -2,9 +2,9 @@
 
 namespace TransmissiveGlass
 {
-    __device__ glm::vec3 sampleSpecularTrans(glm::vec3 nor, glm::vec3 wo) {
+    __device__ glm::vec3 sampleSpecularTrans(glm::vec3 nor, glm::vec3 wo, float ior) {
         float etaA = 1.0f;
-        float etaB = 1.55f;
+        float etaB = ior;
         
         bool enter = glm::dot(wo, nor) > 0.0f;
 
@@ -26,9 +26,9 @@ namespace TransmissiveGlass
         return glm::reflect(-wo, loc_normal);
     }
 
-    __device__ glm::vec3 FresnelDielectricEval(float cosThetaI) {
+    __device__ glm::vec3 FresnelDielectricEval(float cosThetaI, float ior) {
         float etaI = 1.;
-        float etaT = 1.55;
+        float etaT = ior;
         cosThetaI = glm::clamp(cosThetaI, -1.f, 1.f);
 
         bool enter = cosThetaI > 0.f;
@@ -60,7 +60,7 @@ namespace TransmissiveGlass
         float r = u01(rng);
 
         float cos_theta_I = glm::dot(wo, normal);
-        glm::vec3 F_vec = FresnelDielectricEval(cos_theta_I);
+        glm::vec3 F_vec = FresnelDielectricEval(cos_theta_I, material.indexOfRefraction);
         float F = glm::clamp(F_vec.r, 0.0f, 1.0f);
 
         glm::vec3 wi = glm::vec3(0.0, 1.0, 0.0);
@@ -68,7 +68,7 @@ namespace TransmissiveGlass
             wi = sampleSpecularRefl(normal, wo);
         }   
         else {
-            wi = sampleSpecularTrans(normal, wo);
+            wi = sampleSpecularTrans(normal, wo, material.indexOfRefraction);
         }
 
         // the NaN is somewhere here

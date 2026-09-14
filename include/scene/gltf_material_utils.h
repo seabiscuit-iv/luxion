@@ -4,6 +4,8 @@
 
 #include "tinygltf/tiny_gltf.h"
 
+#if !UBER_SHADER
+
 inline bool isGlass(const tinygltf::Material& mat) {
     // 1. Explicit Transmission (Modern standard)
     if (mat.extensions.count("KHR_materials_transmission")) return true;
@@ -39,3 +41,5 @@ inline bool isGlass(const tinygltf::Material& mat) {
 
     return false;
 }
+
+#endif

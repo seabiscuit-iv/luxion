@@ -15,11 +15,11 @@
 
 namespace TransmissiveGlass
 {
-    __device__ glm::vec3 sampleSpecularTrans(glm::vec3 nor, glm::vec3 wo);
+    __device__ glm::vec3 sampleSpecularTrans(glm::vec3 nor, glm::vec3 wo, float ior);
 
     __device__ glm::vec3 sampleSpecularRefl(glm::vec3 nor, glm::vec3 wo);
 
-    __device__ glm::vec3 FresnelDielectricEval(float cosThetaI);
+    __device__ glm::vec3 FresnelDielectricEval(float cosThetaI, float ior);
 
     __device__ void sampleGlass(PathSegment &path, const Material &material, thrust::default_random_engine &rng, glm::vec3 normal);
 
