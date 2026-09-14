@@ -38,6 +38,32 @@ void InitImguiData(GuiDataContainer* guiData)
     app.imguiData = guiData;
 }
 
+#if !UBER_SHADER
+void imgui_material_label() {
+    std::string s = "";
+    AppState& app = AppState::Get();
+
+    MaterialType mat_type = app.scene->materials[PathTracerOptions::Get()->selected_material].material_type;
+
+    if (mat_type == MaterialType::Diffuse) {
+        s = "Diffuse";
+    } 
+    else if (mat_type == MaterialType::Specular) {
+        s = "Specular";
+    } 
+    else if (mat_type == MaterialType::Emissive) {
+        s = "Emissive";
+    } 
+    else if (mat_type == MaterialType::Glass) {
+        s = "Glass";
+    } 
+    else if (mat_type == MaterialType::Microfacet) {
+        s = "Microfacet";
+    }
+
+    ImGui::Text("Material Type: %s", s);
+}
+#endif
 
 // LOOK: Un-Comment to check ImGui Usage
 void RenderImGui()
@@ -97,9 +123,15 @@ void RenderImGui()
 
     changed |= ImGui::Combo("Material Select", &PathTracerOptions::Get()->selected_material, material_select_getter, &app.scene->material_names, (int)app.scene->material_names.size());
 
+    #if !UBER_SHADER
+        imgui_material_label();
+    #endif
+
     changed |= ImGui::ColorEdit3("RGB", glm::value_ptr(app.scene->materials[PathTracerOptions::Get()->selected_material].color));
     changed |= ImGui::SliderFloat("Roughness", &app.scene->materials[PathTracerOptions::Get()->selected_material].roughness, 0.0f, 1.0f);
     changed |= ImGui::SliderFloat("Metallic", &app.scene->materials[PathTracerOptions::Get()->selected_material].metallic, 0.0f, 1.0f);
+
+    changed |= ImGui::SliderFloat("IOR", &app.scene->materials[PathTracerOptions::Get()->selected_material].indexOfRefraction, 0.0f, 5.0f);
     
     changed |= ImGui::ColorEdit3("Emission Color", glm::value_ptr(app.scene->materials[PathTracerOptions::Get()->selected_material].emission.emission_color));
     changed |= ImGui::SliderFloat("Emission Strength", &app.scene->materials[PathTracerOptions::Get()->selected_material].emission.emission_strength, 0.0f, 10.0f);
