@@ -113,7 +113,8 @@ namespace CookTorrance {
 
         glm::vec3 dielectricF0 = glm::vec3(0.04f);
         glm::vec3 F0 = glm::mix(dielectricF0, color, metallic);
-        float probSpecular = glm::clamp(F_SchlickApprox(glm::dot(wo, n), glm::vec3(F0)).r, 0.01f, 0.99f);
+        glm::vec3 F_approx = F_SchlickApprox(glm::dot(wo, n), glm::vec3(F0));
+        float probSpecular = glm::clamp((F_approx.r + F_approx.g + F_approx.b) / 3.0f, 0.01f, 0.99f);
 
         if (r <= probSpecular) {
             sampleGGX(path, idx, iter, depth, wo, n, roughness, rng);
@@ -145,7 +146,8 @@ namespace CookTorrance {
 
         glm::vec3 dielectricF0 = glm::vec3(0.04f);
         glm::vec3 F0 = glm::mix(dielectricF0, color, metallic);
-        float probSpecular = glm::clamp(F_SchlickApprox(glm::dot(wo, n), glm::vec3(F0)).r, 0.01f, 0.99f);
+        glm::vec3 F_approx = F_SchlickApprox(glm::dot(wo, n), glm::vec3(F0));
+        float probSpecular = glm::clamp((F_approx.r + F_approx.g + F_approx.b) / 3.0f, 0.01f, 0.99f);
 
         float pdf = (1.0f - probSpecular) * pdfDiffuse + probSpecular * pdfSpecular;
         return glm::max(pdf, PDF_CLAMP);
