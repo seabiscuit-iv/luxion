@@ -21,8 +21,8 @@ __device__ void update_throughput_materials (
 ) {
 
 #if UBER_SHADER
-    glm::vec3 cook_torrance = CookTorrance::shadePathCookTorrance(path, materialColor, normal, path.sample_dir, roughness, metallic);
-    float pdf = CookTorrance::PDF(-path.ray.direction, path.sample_dir, normal, roughness, metallic, materialColor);
+    glm::vec3 cook_torrance = CookTorrance::shadePathCookTorrance(path, materialColor, normal, path.sample_dir, roughness, metallic, material.indexOfRefraction);
+    float pdf = CookTorrance::PDF(-path.ray.direction, path.sample_dir, normal, roughness, metallic, materialColor, material.indexOfRefraction);
     path.throughput *= cook_torrance / pdf;
     path.last_pdf = pdf;
 #else
@@ -37,8 +37,8 @@ __device__ void update_throughput_materials (
         path.last_pdf = 1.0;
     }
     else if (material.material_type == MaterialType::Microfacet) {
-        glm::vec3 cook_torrance = CookTorrance::shadePathCookTorrance(path, materialColor, normal, path.sample_dir, roughness, metallic);
-        float pdf = CookTorrance::PDF(-path.ray.direction, path.sample_dir, normal, roughness, metallic, materialColor);
+        glm::vec3 cook_torrance = CookTorrance::shadePathCookTorrance(path, materialColor, normal, path.sample_dir, roughness, metallic, material.indexOfRefraction);
+        float pdf = CookTorrance::PDF(-path.ray.direction, path.sample_dir, normal, roughness, metallic, materialColor, material.indexOfRefraction);
         path.throughput *= cook_torrance / pdf;
         path.last_pdf = pdf;
     }

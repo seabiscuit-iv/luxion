@@ -41,13 +41,14 @@ namespace CookTorrance {
         return Smith_GGX(v, n, alpha) * Smith_GGX(l, n, alpha);
     }
     
-    __device__ glm::vec3 BRDF(glm::vec3 v, glm::vec3 n, glm::vec3 l, glm::vec3 albedo, float roughness, float metallic) {
+    __device__ glm::vec3 BRDF(glm::vec3 v, glm::vec3 n, glm::vec3 l, glm::vec3 albedo, float roughness, float metallic, float ior) {
         glm::vec3 h = glm::normalize(v + l);
 
         roughness = glm::clamp(roughness, 0.0001f, 1.0f);
         float alpha = roughness * roughness;
 
-        glm::vec3 dielectricF0 = glm::vec3(0.04f);
+        float f0scalar = glm::pow((ior - 1.0f) / (ior + 1.0f), 2.0f);
+        glm::vec3 dielectricF0 = glm::vec3(f0scalar);
         glm::vec3 F0 = glm::mix(dielectricF0, albedo, metallic);
 
         float D = D_TrowbridgeReitz(h, n, alpha);
@@ -107,13 +108,14 @@ namespace CookTorrance {
         path.sample_dir = wi;
     }
 
-    __device__ void sampleCookTorrance(PathSegment &path, int idx, int iter, int depth, glm::vec3 wo, glm::vec3 n, float roughness, float metallic, thrust::default_random_engine &rng, glm::vec3 color) {
+    __device__ void sampleCookTorrance(PathSegment &path, int idx, int iter, int depth, glm::vec3 wo, glm::vec3 n, float roughness, float metallic, thrust::default_random_engine &rng, glm::vec3 color, float ior) {
         thrust::uniform_real_distribution<float> u01(0, 1);
         float r = u01(rng);
 
-        glm::vec3 dielectricF0 = glm::vec3(0.04f);
+        float f0scalar = glm::pow((ior - 1.0f) / (ior + 1.0f), 2.0f);
+        glm::vec3 dielectricF0 = glm::vec3(f0scalar);
         glm::vec3 F0 = glm::mix(dielectricF0, color, metallic);
-        glm::vec3 F_approx = F_SchlickApprox(glm::dot(wo, n), glm::vec3(F0));
+        glm::vec3 F_approx = F_SchlickApprox(glm::abs(glm::dot(wo, n)), glm::vec3(F0));
         float probSpecular = glm::clamp((F_approx.r + F_approx.g + F_approx.b) / 3.0f, 0.01f, 0.99f);
 
         if (r <= probSpecular) {
@@ -140,13 +142,14 @@ namespace CookTorrance {
     }  
 
     
-    __device__ float PDF(glm::vec3 wo, glm::vec3 wi, glm::vec3 n, float roughness, float metallic, glm::vec3 color) {
+    __device__ float PDF(glm::vec3 wo, glm::vec3 wi, glm::vec3 n, float roughness, float metallic, glm::vec3 color, float ior) {
         float pdfDiffuse  = max(0.0f, glm::dot(wi, n)) * INV_PI;
         float pdfSpecular = PDF_GGX(wo, wi, n, roughness);
 
-        glm::vec3 dielectricF0 = glm::vec3(0.04f);
+        float f0scalar = glm::pow((ior - 1.0f) / (ior + 1.0f), 2.0f);
+        glm::vec3 dielectricF0 = glm::vec3(f0scalar);
         glm::vec3 F0 = glm::mix(dielectricF0, color, metallic);
-        glm::vec3 F_approx = F_SchlickApprox(glm::dot(wo, n), glm::vec3(F0));
+        glm::vec3 F_approx = F_SchlickApprox(glm::abs(glm::dot(wo, n)), glm::vec3(F0));
         float probSpecular = glm::clamp((F_approx.r + F_approx.g + F_approx.b) / 3.0f, 0.01f, 0.99f);
 
         float pdf = (1.0f - probSpecular) * pdfDiffuse + probSpecular * pdfSpecular;
@@ -160,12 +163,13 @@ namespace CookTorrance {
         glm::vec3 normal,
         glm::vec3 wi,
         float roughness,
-        float metallic
+        float metallic,
+        float ior
     )
     {
         glm::vec3 wo = -path.ray.direction;
 
-        glm::vec3 brdf = BRDF(wo, normal, wi, albedo, roughness, metallic);
+        glm::vec3 brdf = BRDF(wo, normal, wi, albedo, roughness, metallic, ior);
 
         #if MICROFACET_REMOVE_FIREFLIES
             brdf = glm::clamp(brdf, glm::vec3(0.0), glm::vec3(1.0));

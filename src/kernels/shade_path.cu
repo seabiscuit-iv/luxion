@@ -55,7 +55,7 @@ __device__ bool material_is_emissive(const Material& material, glm::vec3 emissio
 
 __device__ float get_pdf_bsdf(const PathSegment& path, const Material& material, const glm::vec3& dir, const glm::vec3& normal, float roughness, float metallic, const glm::vec3& materialColor) {
     #if UBER_SHADER
-        return CookTorrance::PDF(-path.ray.direction, dir, normal, roughness, metallic, materialColor);
+        return CookTorrance::PDF(-path.ray.direction, dir, normal, roughness, metallic, materialColor, material.indexOfRefraction);
     #else
         if (material.material_type == MaterialType::Diffuse)
         {
@@ -63,7 +63,7 @@ __device__ float get_pdf_bsdf(const PathSegment& path, const Material& material,
         }
         else if (material.material_type == MaterialType::Microfacet)
         {
-            return CookTorrance::PDF(-path.ray.direction, dir, normal, roughness, metallic, materialColor);
+            return CookTorrance::PDF(-path.ray.direction, dir, normal, roughness, metallic, materialColor, material.indexOfRefraction);
         }
 
         return 0.0f;
@@ -72,7 +72,7 @@ __device__ float get_pdf_bsdf(const PathSegment& path, const Material& material,
 
 __device__ glm::vec3 get_brdf(const PathSegment& path, const Material& material, const glm::vec3& dir, const glm::vec3& normal, float roughness, float metallic, const glm::vec3& materialColor) {
     #if UBER_SHADER
-        return CookTorrance::BRDF(-path.ray.direction, normal, dir, materialColor, roughness, metallic);
+        return CookTorrance::BRDF(-path.ray.direction, normal, dir, materialColor, roughness, metallic, material.indexOfRefraction);
     #else
         if (material.material_type == MaterialType::Diffuse)
         {
@@ -80,7 +80,7 @@ __device__ glm::vec3 get_brdf(const PathSegment& path, const Material& material,
         }
         else if (material.material_type == MaterialType::Microfacet)
         {
-            return CookTorrance::BRDF(-path.ray.direction, normal, dir, materialColor, roughness, metallic);
+            return CookTorrance::BRDF(-path.ray.direction, normal, dir, materialColor, roughness, metallic, material.indexOfRefraction);
         }
 
         return glm::vec3(0.0f);
