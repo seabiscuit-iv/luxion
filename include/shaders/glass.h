@@ -26,7 +26,8 @@ namespace TransmissiveGlass
     __device__ void shadePathGlass(
         PathSegment &path,  
         const Material &material,
-        glm::vec3 color
+        glm::vec3 color,
+        glm::vec3 normal
     );
 }
 

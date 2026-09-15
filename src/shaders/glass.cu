@@ -79,8 +79,23 @@ namespace TransmissiveGlass
     __device__ void shadePathGlass(
         PathSegment &path,  
         const Material &material,
-        glm::vec3 color
+        glm::vec3 color,
+        glm::vec3 normal
     ) {
-        path.throughput *= glm::mix(glm::vec3(1.0), color, material.alpha);
+        glm::vec3 wo = -path.ray.direction;
+
+        float cosThetaI = glm::dot(wo, normal);
+        bool enter = cosThetaI > 0.f;
+
+        float etaI = enter ? 1.0f : material.indexOfRefraction;
+        float etaT = enter ? material.indexOfRefraction : 1.0f;
+
+        bool refract = glm::dot(wo, normal) * glm::dot(path.sample_dir, normal) < 0.0f;
+
+        float atten = refract ? (etaI / etaT) : 1.0f;
+
+        atten = atten * atten;
+
+        path.throughput *= atten * (refract ? glm::mix(glm::vec3(1.0), color, material.alpha) : glm::vec3(1.0f));
     }
 }

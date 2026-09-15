@@ -20,7 +20,7 @@
 #define ENABLE_SPHERE_INTERSECTION  0
 #define ENABLE_MESH_INTERSECTION    1
 
-#define UBER_SHADER 1
+#define UBER_SHADER 0
 
 // deprecated
 #define LOAD_FROM_JSON 0

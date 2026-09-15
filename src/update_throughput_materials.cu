@@ -43,7 +43,7 @@ __device__ void update_throughput_materials (
         path.last_pdf = pdf;
     }
     else if (material.material_type == MaterialType::Glass) {
-        TransmissiveGlass::shadePathGlass(path, material, materialColor);
+        TransmissiveGlass::shadePathGlass(path, material, materialColor, normal);
         path.last_pdf = 1.0;
     }
 #endif
