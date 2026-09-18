@@ -136,6 +136,8 @@ void RenderImGui()
     changed |= ImGui::ColorEdit3("Emission Color", glm::value_ptr(app.scene->materials[PathTracerOptions::Get()->selected_material].emission.emission_color));
     changed |= ImGui::SliderFloat("Emission Strength", &app.scene->materials[PathTracerOptions::Get()->selected_material].emission.emission_strength, 0.0f, 10.0f);
 
+    changed |= ImGui::SliderFloat("Transmission", &app.scene->materials[PathTracerOptions::Get()->selected_material].transmission, 0.0f, 1.0f);
+
     ImGui::End();
 
     if (changed) {

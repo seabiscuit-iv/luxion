@@ -24,22 +24,29 @@ namespace CookTorrance {
 
     __device__ glm::vec3 F_SchlickApprox(float v_dot_h, const glm::vec3& f0);
 
+    __device__ float FresnelDielectric(float cosThetaI, float etaI, float etaT);
+
+    __device__ glm::vec3 transmissionHalfVector(glm::vec3 wo, glm::vec3 wi, float etaI, float etaT);
+
     __device__ float Smith_GGX(glm::vec3 w, glm::vec3 n, float alpha);
 
     __device__ float Smith_G(glm::vec3 v, glm::vec3 l, glm::vec3 n, float alpha);
-    
-    __device__ glm::vec3 BRDF(glm::vec3 v, glm::vec3 n, glm::vec3 l, glm::vec3 albedo, float roughness, float metallic, float ior);
+
+    __device__ glm::vec3 Fresnel(float cosTheta, glm::vec3 albedo, float metallic, float etaI, float etaT);
+
+    __device__ glm::vec3 BRDF(glm::vec3 v, glm::vec3 n, glm::vec3 l, glm::vec3 albedo, float roughness, float metallic, float ior, float transmission);
+
+    __device__ glm::vec3 BTDF(glm::vec3 wo, glm::vec3 n, glm::vec3 wi, glm::vec3 albedo, float roughness, float metallic, float ior, float transmission);
 
     __host__ __device__ glm::vec3 sphericalToCartesian(glm::vec3 spherical);
 
-    __device__ void sampleGGX(PathSegment &path, int idx, int iter, int depth, glm::vec3 wo, glm::vec3 n, float roughness, thrust::default_random_engine &rng);
-
-    __device__ void sampleCookTorrance(PathSegment &path, int idx, int iter, int depth, glm::vec3 wo, glm::vec3 n, float roughness, float metallic, thrust::default_random_engine &rng, glm::vec3 color, float ior);
+    __device__ void sampleCookTorrance(PathSegment &path, int idx, int iter, int depth, glm::vec3 wo, glm::vec3 n, float roughness, float metallic, thrust::default_random_engine &rng, glm::vec3 color, float ior, float transmission);
 
     __device__ float PDF_GGX( glm::vec3 wo, glm::vec3 wi, glm::vec3 n, float roughness);
-    
-    __device__ float PDF(glm::vec3 wo, glm::vec3 wi, glm::vec3 n, float roughness, float metallic, glm::vec3 color, float ior);
 
+    __device__ float PDF_GGX_Transmission( glm::vec3 wo, glm::vec3 wi, glm::vec3 n, float roughness, float ior);
+    
+    __device__ float PDF(glm::vec3 wo, glm::vec3 wi, glm::vec3 n, float roughness, float metallic, glm::vec3 color, float ior, float transmission);
     
     __device__ glm::vec3 shadePathCookTorrance(
         PathSegment &path,
@@ -48,7 +55,8 @@ namespace CookTorrance {
         glm::vec3 wi,
         float roughness,
         float metallic,
-        float ior
+        float ior,
+        float transmission
     );
 
 }

@@ -96,6 +96,6 @@ namespace TransmissiveGlass
 
         atten = atten * atten;
 
-        path.throughput *= atten * (refract ? glm::mix(glm::vec3(1.0), color, material.alpha) : glm::vec3(1.0f));
+        path.throughput *= atten * (refract ? glm::mix(glm::vec3(1.0), color, material.transmission) : glm::vec3(1.0f));
     }
 }

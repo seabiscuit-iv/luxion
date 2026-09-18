@@ -108,9 +108,10 @@ struct Material
 
     float roughness = 0.0f;
     float metallic = 0.0f;
-    float alpha = 1.0f;
     int normal_tex;
     int metallic_roughness_tex = -1;
+
+    float transmission;
 
     TextureTransform albedo_tex_transform;
 

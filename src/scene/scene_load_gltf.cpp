@@ -185,6 +185,17 @@ void Scene::loadFromGLTF(const std::string& gltfName, std::string exr_path) {
 
         newMaterial.indexOfRefraction = ior;
 
+        float transmission = 0.0f;
+        if (mat.extensions.find("KHR_materials_transmission") != mat.extensions.end()) {
+            const auto& ext = mat.extensions.at("KHR_materials_transmission");
+
+            if (ext.Has("transmissionFactor")) {
+                transmission = static_cast<float>(ext.Get("transmissionFactor").GetNumberAsDouble());
+            }
+        }
+
+        newMaterial.transmission = transmission;
+
         #if UBER_SHADER
             newMaterial.material_type = MaterialType::Microfacet;
         #else
@@ -194,7 +205,6 @@ void Scene::loadFromGLTF(const std::string& gltfName, std::string exr_path) {
             }
             else if (isGlass(mat) && newMaterial.metallic < 0.01f && newMaterial.roughness < 0.01f) {
                 newMaterial.material_type = MaterialType::Glass;
-                newMaterial.alpha = static_cast<float>(mat.pbrMetallicRoughness.baseColorFactor[3]);
             }
             else if (newMaterial.metallic_roughness_tex >= 0) {
                 newMaterial.material_type = MaterialType::Microfacet;

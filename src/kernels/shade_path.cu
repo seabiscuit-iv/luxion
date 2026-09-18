@@ -19,6 +19,7 @@
 
 #define M_PI 3.14159
 #define GLASS_EPSILON 0.01f
+#define SPECULAR_ROUGHNESS 0.05f
 
 __device__ float envmap_pdf(glm::vec3 d, float* marginal_cdf, float* conditional_cdfs, int W, int H) {
     float phi   = atan2f(d.z, d.x);
@@ -37,9 +38,9 @@ __device__ float envmap_pdf(glm::vec3 d, float* marginal_cdf, float* conditional
     return (sin_theta > 1e-6f) ? (p_marginal * p_conditional) / (2.0f * PI * PI * sin_theta) : 0.0f;
 }
 
-__device__ bool material_is_specular(const Material& material) {
+__device__ bool material_is_specular(const Material& material, float roughness) {
     #if UBER_SHADER
-        return false;
+        return roughness < SPECULAR_ROUGHNESS;
     #else
         return (material.material_type == MaterialType::Specular || material.material_type == MaterialType::Glass);
     #endif
@@ -55,7 +56,7 @@ __device__ bool material_is_emissive(const Material& material, glm::vec3 emissio
 
 __device__ float get_pdf_bsdf(const PathSegment& path, const Material& material, const glm::vec3& dir, const glm::vec3& normal, float roughness, float metallic, const glm::vec3& materialColor) {
     #if UBER_SHADER
-        return CookTorrance::PDF(-path.ray.direction, dir, normal, roughness, metallic, materialColor, material.indexOfRefraction);
+        return CookTorrance::PDF(-path.ray.direction, dir, normal, roughness, metallic, materialColor, material.indexOfRefraction, material.transmission);
     #else
         if (material.material_type == MaterialType::Diffuse)
         {
@@ -63,7 +64,7 @@ __device__ float get_pdf_bsdf(const PathSegment& path, const Material& material,
         }
         else if (material.material_type == MaterialType::Microfacet)
         {
-            return CookTorrance::PDF(-path.ray.direction, dir, normal, roughness, metallic, materialColor, material.indexOfRefraction);
+            return CookTorrance::PDF(-path.ray.direction, dir, normal, roughness, metallic, materialColor, material.indexOfRefraction, material.transmission);
         }
 
         return 0.0f;
@@ -72,7 +73,7 @@ __device__ float get_pdf_bsdf(const PathSegment& path, const Material& material,
 
 __device__ glm::vec3 get_brdf(const PathSegment& path, const Material& material, const glm::vec3& dir, const glm::vec3& normal, float roughness, float metallic, const glm::vec3& materialColor) {
     #if UBER_SHADER
-        return CookTorrance::BRDF(-path.ray.direction, normal, dir, materialColor, roughness, metallic, material.indexOfRefraction);
+        return CookTorrance::BRDF(-path.ray.direction, normal, dir, materialColor, roughness, metallic, material.indexOfRefraction, material.transmission);
     #else
         if (material.material_type == MaterialType::Diffuse)
         {
@@ -80,7 +81,7 @@ __device__ glm::vec3 get_brdf(const PathSegment& path, const Material& material,
         }
         else if (material.material_type == MaterialType::Microfacet)
         {
-            return CookTorrance::BRDF(-path.ray.direction, normal, dir, materialColor, roughness, metallic, material.indexOfRefraction);
+            return CookTorrance::BRDF(-path.ray.direction, normal, dir, materialColor, roughness, metallic, material.indexOfRefraction, material.transmission);
         }
 
         return glm::vec3(0.0f);
@@ -138,7 +139,9 @@ __global__ void shadePath(
         float metallic = metallic_roughness.y;
 
         glm::vec3 emission = get_emission(material, intersection.uvs, textures);
-        bool is_specular = material_is_specular(material);
+        bool is_specular = material_is_specular(material, roughness);
+
+        glm::vec3 n_facing = glm::dot(-path.ray.direction, normal) < 0.0f ? -normal : normal;
 
         if (DEV_OPTIONS.material_debug_mode != 0) {
             render_material_debug_mode(
@@ -202,7 +205,7 @@ __global__ void shadePath(
                         float4 env = tex2D<float4>(exr, u, v);
                         glm::vec3 env_light = glm::vec3(env.x, env.y, env.z) * DEV_OPTIONS.envmap_intensity;
 
-                        float cosThetaSurface = glm::dot(normal, env_dir);
+                        float cosThetaSurface = glm::dot(n_facing, env_dir);
 
                         if (cosThetaSurface > 0.0f && pdf_env_of_env > 1e-8f) {
                             glm::vec3 contribution = (env_light * brdf * cosThetaSurface) / pdf_env_of_env;
@@ -246,7 +249,7 @@ __global__ void shadePath(
                         float dist = sqrt(dist_sq);
                         glm::vec3 light_dir = light_vec / dist;
 
-                        float cosThetaSurface = glm::dot(normal, light_dir);
+                        float cosThetaSurface = glm::dot(n_facing, light_dir);
                         float cosThetaLight = glm::dot(direct_light_intersection.surfaceNormal, -light_dir);
 
                         if (cosThetaSurface > 0.0f && cosThetaLight > 0.0f) {
