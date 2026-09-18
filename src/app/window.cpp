@@ -51,7 +51,7 @@ bool init()
         exit(EXIT_FAILURE);
     }
 
-    app.window = glfwCreateWindow(app.width, app.height, "CIS 565 Path Tracer", NULL, NULL);
+    app.window = glfwCreateWindow(app.width, app.height, "Luxion", NULL, NULL);
     if (!app.window)
     {
         glfwTerminate();

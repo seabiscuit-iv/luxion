@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(cis565_path_tracer LANGUAGES CUDA CXX)
+project(luxion LANGUAGES CUDA CXX)
 
 include(FetchContent)
 

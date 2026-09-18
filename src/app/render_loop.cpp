@@ -45,7 +45,7 @@ void mainLoop()
 
         runCuda();
 
-        std::string title = "CIS565 Path Tracer | " + utilityCore::convertIntToString(app.iteration) + " Iterations";
+        std::string title = "Luxion | " + utilityCore::convertIntToString(app.iteration) + " Iterations";
         glfwSetWindowTitle(app.window, title.c_str());
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, app.pbo);
         glBindTexture(GL_TEXTURE_2D, app.displayImage);
