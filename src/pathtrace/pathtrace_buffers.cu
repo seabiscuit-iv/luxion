@@ -60,6 +60,21 @@ void pathtraceInit(Scene* scene)
     }
     cudaMemcpy(pt_state.dev_material_ids, material_ids.data(), material_ids.size() * sizeof(int), cudaMemcpyHostToDevice);
 
+    std::vector<OptixAlphaMaterial> alpha_materials;
+    for (const Material& mat : scene->materials) {
+        OptixAlphaMaterial alpha_mat = {};
+        alpha_mat.alpha_mode = mat.alpha_mode;
+        alpha_mat.alpha = mat.alpha;
+        alpha_mat.alpha_cutoff = mat.alpha_cutoff;
+        alpha_mat.albedo_tex = mat.albedo_tex >= 0 ? TextureHandler::get().host_textures[mat.albedo_tex].tex : 0;
+        alpha_mat.tex_offset = make_float2(mat.albedo_tex_transform.offset.x, mat.albedo_tex_transform.offset.y);
+        alpha_mat.tex_scale = make_float2(mat.albedo_tex_transform.scale.x, mat.albedo_tex_transform.scale.y);
+        alpha_mat.tex_rotation = mat.albedo_tex_transform.rotation;
+        alpha_materials.push_back(alpha_mat);
+    }
+    cudaMalloc( &pt_state.dev_alpha_materials, sizeof(OptixAlphaMaterial) * alpha_materials.size());
+    cudaMemcpy(pt_state.dev_alpha_materials, alpha_materials.data(), alpha_materials.size() * sizeof(OptixAlphaMaterial), cudaMemcpyHostToDevice);
+
     std::vector<glm::vec3*> vertex_buffer_locs;
     std::vector<Triangle*> triangle_buffer_locs;
     std::vector<glm::vec3*> normal_buffer_locs;
@@ -138,6 +153,7 @@ void pathtraceFree()
     cudaFree(pt_state.dev_morton_codes);
     cudaFree(pt_state.dev_path_scatter_buf);
     cudaFree(pt_state.dev_material_ids);
+    cudaFree(pt_state.dev_alpha_materials);
 
     cudaFree(pt_state.dev_vertex_buffer_locs);
     cudaFree(pt_state.dev_triangle_buffer_locs);

@@ -139,6 +139,7 @@ __global__ void shadePath(
         float metallic = metallic_roughness.y;
 
         glm::vec3 emission = get_emission(material, intersection.uvs, textures);
+        float alpha = get_alpha(material, intersection.uvs, textures);
         bool is_specular = material_is_specular(material, roughness);
 
         glm::vec3 n_facing = glm::dot(-path.ray.direction, normal) < 0.0f ? -normal : normal;
@@ -151,6 +152,7 @@ __global__ void shadePath(
                 normal_map,
                 roughness,
                 metallic,
+                alpha,
                 DEV_OPTIONS.material_debug_mode
             );
         }

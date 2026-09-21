@@ -22,6 +22,33 @@ static __forceinline__ __device__ void computeRay( uint3 idx, uint3 dim, float3&
 }
 
 
+static __forceinline__ __device__ float2 interpolate_uv( const float2* uv_buffer, const OptixTriangle& triangle, float2 barycentrics )
+{
+    if (uv_buffer == nullptr) {
+        return make_float2(0.0f, 0.0f);
+    }
+
+    float2 A_uv = uv_buffer[triangle.uv_indices[0]];
+    float2 B_uv = uv_buffer[triangle.uv_indices[1]];
+    float2 C_uv = uv_buffer[triangle.uv_indices[2]];
+
+    float bA = 1.0f - barycentrics.x - barycentrics.y;
+
+    return bA * A_uv + barycentrics.x * B_uv + barycentrics.y * C_uv;
+}
+
+
+static __forceinline__ __device__ unsigned int hash_u32( unsigned int x )
+{
+    x ^= x >> 16;
+    x *= 0x7feb352du;
+    x ^= x >> 15;
+    x *= 0x846ca68bu;
+    x ^= x >> 16;
+    return x;
+}
+
+
 extern "C" __global__ void __raygen__rg()
 {
     const uint3 idx = optixGetLaunchIndex();
@@ -94,7 +121,7 @@ extern "C" __global__ void __raygen__rg()
                 1e16f,
                 0.0f,
                 OptixVisibilityMask( 255 ),
-                OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT | OPTIX_RAY_FLAG_DISABLE_CLOSESTHIT | OPTIX_RAY_FLAG_DISABLE_ANYHIT,
+                OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT | OPTIX_RAY_FLAG_DISABLE_CLOSESTHIT,
                 RAY_TYPE_ENV_MAP,
                 RAY_TYPE_COUNT,
                 RAY_TYPE_ENV_MAP,
@@ -265,14 +292,7 @@ extern "C" __global__ void __closesthit__ch_direct_light()
         normal = normalize(cross(B - A, C - A));
     }
 
-    float2 uv = make_float2(0.0f, 0.0f);
-    if (uv_buffer != nullptr) {
-        float2 A_uv = uv_buffer[triangle.uv_indices[0]];
-        float2 B_uv = uv_buffer[triangle.uv_indices[1]];
-        float2 C_uv = uv_buffer[triangle.uv_indices[2]];
-
-        uv = bA * A_uv + barycentrics.x * B_uv + barycentrics.y * C_uv;
-    }
+    float2 uv = interpolate_uv(uv_buffer, triangle, barycentrics);
 
     normal = normalize(optixTransformNormalFromObjectToWorldSpace(normal));
 
@@ -291,3 +311,57 @@ extern "C" __global__ void __miss__ms_envmap()
 {
     optixSetPayload_0( 0 );
 }
+
+
+
+extern "C" __global__ void __anyhit__ms_all()
+{
+    const unsigned int object_ID = optixGetInstanceId();
+    const unsigned int prim_ID = optixGetPrimitiveIndex();
+
+    const OptixAlphaMaterial& material = params.alpha_materials[params.material_ids[object_ID]];
+
+    if (material.alpha_mode == OPTIX_ALPHA_MODE_OPAQUE) {
+        return;
+    }
+
+    float alpha = material.alpha;
+
+    if (material.albedo_tex != 0) {
+        const OptixTriangle& triangle = params.triangle_buffer_locations[object_ID][prim_ID];
+        float2 uv = interpolate_uv(params.uv_buffer_locations[object_ID], triangle, optixGetTriangleBarycentrics());
+
+        uv = uv * material.tex_scale;
+        if (material.tex_rotation != 0.0f) {
+            float c = cosf(material.tex_rotation);
+            float s = sinf(material.tex_rotation);
+            uv = make_float2(c * uv.x - s * uv.y, s * uv.x + c * uv.y);
+        }
+        uv = uv + material.tex_offset;
+
+        float4 tex = tex2D<float4>(material.albedo_tex, uv.x, uv.y);
+        alpha *= tex.w;
+    }
+
+    if (material.alpha_mode == OPTIX_ALPHA_MODE_MASK) {
+        if (alpha < material.alpha_cutoff) {
+            optixIgnoreIntersection();
+        }
+        return;
+    }
+
+    const float3 dir = optixGetWorldRayDirection();
+
+    unsigned int h = hash_u32(optixGetLaunchIndex().x ^ hash_u32(params.iteration));
+    h = hash_u32(h ^ __float_as_uint(dir.x));
+    h = hash_u32(h ^ __float_as_uint(dir.y));
+    h = hash_u32(h ^ __float_as_uint(dir.z));
+    h = hash_u32(h ^ object_ID);
+    h = hash_u32(h ^ prim_ID);
+
+    float rnd = (h >> 8) * (1.0f / 16777216.0f);
+    if (rnd >= alpha) {
+        optixIgnoreIntersection();
+    }
+}
+

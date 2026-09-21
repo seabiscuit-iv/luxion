@@ -7,6 +7,7 @@ __device__ void render_material_debug_mode(
     glm::vec3 normal_map,
     float roughness,
     float metallic,
+    float alpha,
     int material_debug_mode
 ) {
     glm::vec3 debug_color(0.0f);
@@ -17,6 +18,7 @@ __device__ void render_material_debug_mode(
         case 3: debug_color = normal_map;                  break;
         case 4: debug_color = glm::vec3(roughness);        break;
         case 5: debug_color = glm::vec3(metallic);         break;
+        case 6: debug_color = glm::vec3(alpha);         break;
     }
 
     path.color = debug_color;

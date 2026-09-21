@@ -10,6 +10,7 @@
 
 class Scene;
 class GuiDataContainer;
+struct OptixAlphaMaterial;
 
 struct PathTraceState {
     Scene* hst_scene = nullptr;
@@ -24,6 +25,7 @@ struct PathTraceState {
     ShadeableIntersection* dev_environment_map_intersections = nullptr;
 
     int* dev_material_ids = nullptr; //for optix
+    OptixAlphaMaterial* dev_alpha_materials = nullptr;
 
     glm::vec3** dev_vertex_buffer_locs = nullptr;
     Triangle** dev_triangle_buffer_locs = nullptr;

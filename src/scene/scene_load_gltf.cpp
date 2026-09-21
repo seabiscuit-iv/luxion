@@ -196,6 +196,16 @@ void Scene::loadFromGLTF(const std::string& gltfName, std::string exr_path) {
 
         newMaterial.transmission = transmission;
 
+        newMaterial.alpha = mat.pbrMetallicRoughness.baseColorFactor[3];
+
+        if (mat.alphaMode == "MASK") {
+            newMaterial.alpha_mode = ALPHA_MODE_MASK;
+        }
+        else if (mat.alphaMode == "BLEND") {
+            newMaterial.alpha_mode = ALPHA_MODE_BLEND;
+        }
+        newMaterial.alpha_cutoff = static_cast<float>(mat.alphaCutoff);
+
         #if UBER_SHADER
             newMaterial.material_type = MaterialType::Microfacet;
         #else

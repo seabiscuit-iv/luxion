@@ -68,6 +68,8 @@ void create_optix_program_groups(
     hitgroup_prog_group_desc.kind                         = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
     hitgroup_prog_group_desc.hitgroup.moduleCH            = module;
     hitgroup_prog_group_desc.hitgroup.entryFunctionNameCH = "__closesthit__ch";
+    hitgroup_prog_group_desc.hitgroup.moduleAH            = module;
+    hitgroup_prog_group_desc.hitgroup.entryFunctionNameAH = "__anyhit__ms_all";
     OPTIX_CHECK_LOG( optixProgramGroupCreate(
                 optix,
                 &hitgroup_prog_group_desc,
@@ -82,6 +84,8 @@ void create_optix_program_groups(
     directlight_hitgroup_prog_group_desc.kind                         = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
     directlight_hitgroup_prog_group_desc.hitgroup.moduleCH            = module;
     directlight_hitgroup_prog_group_desc.hitgroup.entryFunctionNameCH = "__closesthit__ch_direct_light";
+    directlight_hitgroup_prog_group_desc.hitgroup.moduleAH            = module;
+    directlight_hitgroup_prog_group_desc.hitgroup.entryFunctionNameAH = "__anyhit__ms_all";
     OPTIX_CHECK_LOG( optixProgramGroupCreate(
                 optix,
                 &directlight_hitgroup_prog_group_desc,
@@ -108,6 +112,8 @@ void create_optix_program_groups(
 
     OptixProgramGroupDesc envmap_hit_prog_group_desc = {};
     envmap_hit_prog_group_desc.kind                         = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
+    envmap_hit_prog_group_desc.hitgroup.moduleAH            = module;
+    envmap_hit_prog_group_desc.hitgroup.entryFunctionNameAH = "__anyhit__ms_all";
     OPTIX_CHECK_LOG( optixProgramGroupCreate(
                 optix,
                 &envmap_hit_prog_group_desc,

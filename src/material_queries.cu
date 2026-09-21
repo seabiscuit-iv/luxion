@@ -115,3 +115,23 @@ __device__ glm::vec3 get_emission(const Material &material, glm::vec2 uv, const 
 
     return emission;
 }
+
+__device__ float get_alpha(const Material& material, glm::vec2 uv, const TextureData* textures) {
+    if (material.alpha_mode == ALPHA_MODE_OPAQUE) {
+        return 1.0f;
+    }
+
+    float alpha = material.alpha;
+    if(material.albedo_tex >= 0) {
+        uv = apply_texture_transform(uv, material.albedo_tex_transform);
+
+        float4 tex = tex2D<float4>(textures[material.albedo_tex].tex, uv.x, uv.y);
+        alpha *= tex.w;
+    }
+
+    if (material.alpha_mode == ALPHA_MODE_MASK) {
+        return alpha >= material.alpha_cutoff ? 1.0f : 0.0f;
+    }
+
+    return alpha;
+}

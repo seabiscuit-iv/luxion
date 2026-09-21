@@ -14,5 +14,6 @@ __device__ void render_material_debug_mode (
     glm::vec3 normal_map,
     float roughness,
     float metallic,
+    float alpha,
     int material_debug_mode
 );

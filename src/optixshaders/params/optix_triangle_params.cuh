@@ -47,6 +47,25 @@ struct OptixShadeableIntersection
   float v;                  
 };
 
+// sceneStructs.h
+enum OptixAlphaMode
+{
+    OPTIX_ALPHA_MODE_OPAQUE = 0,
+    OPTIX_ALPHA_MODE_MASK,
+    OPTIX_ALPHA_MODE_BLEND
+};
+
+struct OptixAlphaMaterial
+{
+    int alpha_mode;
+    float alpha;
+    float alpha_cutoff;
+    unsigned long long albedo_tex;
+    float2 tex_offset;
+    float2 tex_scale;
+    float tex_rotation;
+};
+
 struct OptixTriangle {
     unsigned int v_indices[3];
     unsigned int n_indices[3];
@@ -63,6 +82,8 @@ struct Params
     OptixShadeableIntersection* direct_light_intersections;    
     OptixShadeableIntersection* environment_map_intersections;    
     int* material_ids;
+    OptixAlphaMaterial* alpha_materials;
+    unsigned int iteration;
 
     float3** vertex_buffer_locations;
     OptixTriangle** triangle_buffer_locations;

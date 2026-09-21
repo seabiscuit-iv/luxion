@@ -216,6 +216,8 @@ void pathtrace(uchar4* pbo, int frame, int iter)
                 optix_params.direct_light_intersections = reinterpret_cast<OptixShadeableIntersection*>(pt_state.dev_direct_light_intersections);
                 optix_params.environment_map_intersections = reinterpret_cast<OptixShadeableIntersection*>(pt_state.dev_environment_map_intersections);
                 optix_params.material_ids = pt_state.dev_material_ids;
+                optix_params.alpha_materials = pt_state.dev_alpha_materials;
+                optix_params.iteration = iter;
                 optix_params.vertex_buffer_locations = (float3**)pt_state.dev_vertex_buffer_locs;
                 optix_params.triangle_buffer_locations = (OptixTriangle**)pt_state.dev_triangle_buffer_locs;
                 optix_params.normal_buffer_locations = (float3**)pt_state.dev_normal_buffer_locs;

@@ -89,7 +89,7 @@ void RenderImGui()
         changed |= ImGui::Checkbox("Debug BVH", &PathTracerOptions::Get()->debug_bvh);
     #endif
 
-    const char* material_debug_modes[6] = {"Off", "Albedo", "World Normal", "Normal Map", "Roughness", "Metallic"};
+    const char* material_debug_modes[7] = {"Off", "Albedo", "World Normal", "Normal Map", "Roughness", "Metallic", "Alpha"};
     changed |= ImGui::Combo("Material Debug Mode", &PathTracerOptions::Get()->material_debug_mode, material_debug_modes, IM_ARRAYSIZE(material_debug_modes));
 
     const bool material_debug_active = PathTracerOptions::Get()->material_debug_mode != 0;
@@ -128,6 +128,16 @@ void RenderImGui()
     #endif
 
     changed |= ImGui::ColorEdit3("RGB", glm::value_ptr(app.scene->materials[PathTracerOptions::Get()->selected_material].color));
+    const char* alpha_modes[3] = {"Opaque", "Mask", "Blend"};
+    int alpha_mode = app.scene->materials[PathTracerOptions::Get()->selected_material].alpha_mode;
+    if (ImGui::Combo("Alpha Mode", &alpha_mode, alpha_modes, IM_ARRAYSIZE(alpha_modes))) {
+        app.scene->materials[PathTracerOptions::Get()->selected_material].alpha_mode = static_cast<AlphaMode>(alpha_mode);
+        changed = true;
+    }
+    changed |= ImGui::SliderFloat("Alpha", &app.scene->materials[PathTracerOptions::Get()->selected_material].alpha, 0.0f, 1.0f);
+    ImGui::BeginDisabled(alpha_mode != ALPHA_MODE_MASK);
+    changed |= ImGui::SliderFloat("Alpha Cutoff", &app.scene->materials[PathTracerOptions::Get()->selected_material].alpha_cutoff, 0.0f, 1.0f);
+    ImGui::EndDisabled();
     changed |= ImGui::SliderFloat("Roughness", &app.scene->materials[PathTracerOptions::Get()->selected_material].roughness, 0.0f, 1.0f);
     changed |= ImGui::SliderFloat("Metallic", &app.scene->materials[PathTracerOptions::Get()->selected_material].metallic, 0.0f, 1.0f);
 

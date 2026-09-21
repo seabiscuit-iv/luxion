@@ -79,6 +79,12 @@ struct Geom
 };
 
 
+enum AlphaMode {
+    ALPHA_MODE_OPAQUE = 0,
+    ALPHA_MODE_MASK,
+    ALPHA_MODE_BLEND
+};
+
 struct TextureTransform {
     glm::vec2 offset{0.0f, 0.0f};
     glm::vec2 scale{1.0f, 1.0f};
@@ -89,7 +95,7 @@ struct Material
 {
     MaterialType material_type;
     glm::vec3 color;
-    int albedo_tex;
+    int albedo_tex = -1;
     struct
     {
         float exponent;
@@ -98,6 +104,10 @@ struct Material
     float hasReflective;
     float hasRefractive;
     float indexOfRefraction;
+
+    float alpha = 1.0f;
+    AlphaMode alpha_mode = ALPHA_MODE_OPAQUE;
+    float alpha_cutoff = 0.5f;
     
     struct {
         float emission_strength = 0.0f;
@@ -108,7 +118,7 @@ struct Material
 
     float roughness = 0.0f;
     float metallic = 0.0f;
-    int normal_tex;
+    int normal_tex = -1;
     int metallic_roughness_tex = -1;
 
     float transmission;
