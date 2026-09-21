@@ -32,7 +32,6 @@ void init_optix() {
         if (cu_ctx == nullptr) {
             printf("Error: No active CUDA context found!\n");
         }
-        printf("FUNCTION: %p\n", OPTIX_FUNCTION_TABLE_SYMBOL.optixDeviceContextCreate);
         OPTIX_CHECK( optixDeviceContextCreate( cu_ctx, &optx_options, &optix ) );
     } 
     catch (const std::exception& e) {
