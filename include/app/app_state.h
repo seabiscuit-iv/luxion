@@ -15,6 +15,7 @@ struct ImGuiIO;
 
 struct AppState {
     std::string startTimeString;
+    std::string outputName; // if non-empty, overrides the default output image name (without .png)
 
     // For camera controls
     bool leftMousePressed = false;

@@ -66,10 +66,17 @@ void saveImage()
         }
     }
 
-    std::string filename = app.renderState->imageName;
-    std::ostringstream ss;
-    ss << "img/" << filename << "." << app.startTimeString << "." << samples << "samp";
-    filename = ss.str();
+    std::string filename;
+    if (!app.outputName.empty())
+    {
+        filename = app.outputName;
+    }
+    else
+    {
+        std::ostringstream ss;
+        ss << "img/" << app.renderState->imageName << "." << app.startTimeString << "." << samples << "samp";
+        filename = ss.str();
+    }
 
     // CHECKITOUT
     img.savePNG(filename);

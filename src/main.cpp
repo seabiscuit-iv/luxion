@@ -76,6 +76,7 @@ int main(int argc, char** argv)
 
     const char* sceneFile = nullptr;
     const char* env_map_path = nullptr;
+    unsigned int iterations = 5000;
 
     for (int i = 1; i < argc; ++i)
     {
@@ -87,6 +88,31 @@ int main(int argc, char** argv)
                 return 1;
             }
             env_map_path = argv[++i];
+        }
+        else if (strcmp(argv[i], "-i") == 0 || strcmp(argv[i], "--iterations") == 0)
+        {
+            if (i + 1 >= argc)
+            {
+                printf("Error: %s requires a number\n", argv[i]);
+                return 1;
+            }
+            char* end = nullptr;
+            long val = strtol(argv[++i], &end, 10);
+            if (*end != '\0' || val <= 0)
+            {
+                printf("Error: invalid iteration count '%s'\n", argv[i]);
+                return 1;
+            }
+            iterations = static_cast<unsigned int>(val);
+        }
+        else if (strcmp(argv[i], "-o") == 0 || strcmp(argv[i], "--output") == 0)
+        {
+            if (i + 1 >= argc)
+            {
+                printf("Error: %s requires a name\n", argv[i]);
+                return 1;
+            }
+            app.outputName = argv[++i];
         }
         else
         {
@@ -104,7 +130,7 @@ int main(int argc, char** argv)
 
     if (!sceneFile)
     {
-        printf("Usage: %s SCENEFILE.json [-e|--envmap ENVMAP]\n", argv[0]);
+        printf("Usage: %s SCENEFILE [-e|--envmap ENVMAP] [-i|--iterations N] [-o|--output NAME]\n", argv[0]);
         return 1;
     }
 
@@ -117,6 +143,7 @@ int main(int argc, char** argv)
     // Set up camera stuff from loaded path tracer settings
     app.iteration = 0;
     app.renderState = &app.scene->state;
+    app.renderState->iterations = iterations;
     Camera& cam = app.renderState->camera;
     app.width = cam.resolution.x;
     app.height = cam.resolution.y;
