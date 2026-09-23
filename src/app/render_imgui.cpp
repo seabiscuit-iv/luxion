@@ -28,6 +28,9 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <cmath>
+#include <utility>
+#include <vector>
 #include "ImGui/imgui.h"
 #include "ImGui/imgui_impl_glfw.h"
 #include "ImGui/imgui_impl_opengl3.h"
@@ -62,6 +65,102 @@ void imgui_material_label() {
     }
 
     ImGui::Text("Material Type: %s", s);
+}
+#endif
+
+#if PROFILE
+void RenderStageTimings()
+{
+    AppState& app = AppState::Get();
+    const auto& latest = app.imguiData->TimerBars;
+
+    static std::vector<std::vector<TimerStage>> smoothed;
+    const float smoothing = 0.05f;
+
+    smoothed.resize(latest.size());
+    for (size_t b = 0; b < latest.size(); ++b) {
+        bool same_stages = smoothed[b].size() == latest[b].size();
+        for (size_t s = 0; same_stages && s < latest[b].size(); ++s) {
+            same_stages = smoothed[b][s].name == latest[b][s].name;
+        }
+
+        if (!same_stages) {
+            smoothed[b] = latest[b];
+            continue;
+        }
+
+        for (size_t s = 0; s < latest[b].size(); ++s) {
+            smoothed[b][s].ms += smoothing * (latest[b][s].ms - smoothed[b][s].ms);
+        }
+    }
+
+    const auto& bars = smoothed;
+
+    static std::vector<std::pair<std::string, ImU32>> stage_colors;
+    auto color_for = [](const std::string& name) -> ImU32 {
+        for (const auto& stage : stage_colors) {
+            if (stage.first == name) {
+                return stage.second;
+            }
+        }
+        float hue = std::fmod(stage_colors.size() * 0.618034f, 1.0f);
+        ImU32 color = ImColor::HSV(hue, 0.6f, 0.9f);
+        stage_colors.push_back({ name, color });
+        return color;
+    };
+
+    ImGui::Begin("Stage Timings");
+
+    if (bars.empty()) {
+        ImGui::TextDisabled("No timing data");
+        ImGui::End();
+        return;
+    }
+
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    const float bar_height = ImGui::GetTextLineHeight() + 4.0f;
+
+    for (size_t b = 0; b < bars.size(); ++b) {
+        float total = 0.0f;
+        for (const TimerStage& stage : bars[b]) {
+            total += stage.ms;
+        }
+
+        ImGui::Text("Bounce %d  (%.3f ms)", (int)b + 1, total);
+
+        ImVec2 origin = ImGui::GetCursorScreenPos();
+        float width = ImGui::GetContentRegionAvail().x;
+        ImGui::Dummy(ImVec2(width, bar_height));
+
+        if (total <= 0.0f) {
+            continue;
+        }
+
+        float x = origin.x;
+        for (const TimerStage& stage : bars[b]) {
+            float w = width * (stage.ms / total);
+            ImVec2 seg_min(x, origin.y);
+            ImVec2 seg_max(x + w, origin.y + bar_height);
+            draw_list->AddRectFilled(seg_min, seg_max, color_for(stage.name));
+            if (ImGui::IsMouseHoveringRect(seg_min, seg_max)) {
+                ImGui::SetTooltip("%s\n%.3f ms (%.1f%%)", stage.name.c_str(), stage.ms, 100.0f * stage.ms / total);
+            }
+            x += w;
+        }
+    }
+
+    ImGui::Separator();
+
+    const float swatch = ImGui::GetTextLineHeight();
+    for (const auto& stage : stage_colors) {
+        ImVec2 p = ImGui::GetCursorScreenPos();
+        draw_list->AddRectFilled(p, ImVec2(p.x + swatch, p.y + swatch), stage.second);
+        ImGui::Dummy(ImVec2(swatch, swatch));
+        ImGui::SameLine();
+        ImGui::TextUnformatted(stage.first.c_str());
+    }
+
+    ImGui::End();
 }
 #endif
 
@@ -158,6 +257,10 @@ void RenderImGui()
     ImGui::EndDisabled();
 
     ImGui::End();
+
+    #if PROFILE
+        RenderStageTimings();
+    #endif
 
     if (changed && !app.locked) {
         app.scene->precompute_emissive_mesh_area();

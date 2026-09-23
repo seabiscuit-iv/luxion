@@ -51,3 +51,30 @@ float CudaTimer::get_elapsed(const std::string& from, const std::string& to) {
     cudaEventElapsedTime(&ms, it1->event, it2->event);
     return ms;
 }
+
+std::vector<std::vector<TimerStage>> CudaTimer::stage_bars() {
+    std::vector<std::vector<TimerStage>> bars;
+    if (events.size() < 2) {
+        return bars;
+    }
+
+    cudaEventSynchronize(events.back().event);
+
+    for (size_t i = 0; i < events.size(); ++i) {
+        const std::string& name = events[i].name;
+
+        if (name.rfind("Start", 0) == 0) {
+            bars.emplace_back();
+            continue;
+        }
+        if (i == 0 || bars.empty() || name.rfind("End", 0) == 0) {
+            continue;
+        }
+
+        float ms = 0.0f;
+        cudaEventElapsedTime(&ms, events[i - 1].event, events[i].event);
+        bars.back().push_back({ name.substr(0, name.find(", Iter")), ms });
+    }
+
+    return bars;
+}

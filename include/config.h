@@ -2,7 +2,7 @@
 #define STREAM_COMPACTION 1
 #define MATERIAL_SORTING 0  // enable this if you have a high number of materials
 #define RAY_SORTING 0       // morton-sort rays for coherence
-#define PROFILE 0           // per-stage cuda event timing
+#define PROFILE 1           // per-stage cuda event timing
 
 #define RUSSIAN_ROULETTE_MIN_DEPTH 3
 

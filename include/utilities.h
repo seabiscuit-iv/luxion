@@ -15,11 +15,18 @@
 #define SQRT_OF_ONE_THIRD 0.5773502691896257645091487805019574556476f
 #define EPSILON           0.00001f
 
+struct TimerStage
+{
+    std::string name;
+    float ms;
+};
+
 class GuiDataContainer
 {
 public:
     GuiDataContainer() : TracedDepth(0) {}
     int TracedDepth;
+    std::vector<std::vector<TimerStage>> TimerBars;
 };
 
 namespace utilityCore

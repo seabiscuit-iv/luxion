@@ -9,6 +9,7 @@
 #include <fmt/core.h>
 
 #include "config.h"
+#include "utilities.h"
 
 #if PROFILE
     #define CUDA_TIMER_RECORD(timer, ...) (timer).record(fmt::format(__VA_ARGS__))
@@ -31,6 +32,7 @@ struct CudaTimer {
     void report();
     void clean();
     float get_elapsed(const std::string& from, const std::string& to);
+    std::vector<std::vector<TimerStage>> stage_bars();
 
 
     auto findEvent(const std::string& name) {

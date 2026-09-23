@@ -117,13 +117,17 @@ void pathtrace(uchar4* pbo, int frame, int iter)
     // 1D block for path tracing
     const int blockSize1d = BLOCK_SIZE_1D;
 
+    CudaTimer cudaTimer;
+
+    CUDA_TIMER_RECORD(cudaTimer, "Start, Iter {}", 1);
+
     generateRayFromCamera<<<blocksPerGrid2d, blockSize2d>>>(cam, iter, traceDepth, pt_state.dev_paths, pt_state.dev_path_indices_A);
     checkCUDAError("generate camera ray");
 
+    CUDA_TIMER_RECORD(cudaTimer, "Generate Camera Rays, Iter {}", 1);
+
     int depth = 0;
     int num_paths = pixelcount;
-
-    CudaTimer cudaTimer;
 
     PathSegment* dev_paths = pt_state.dev_paths;
     int* dev_path_indices = pt_state.dev_path_indices_A;
@@ -132,7 +136,9 @@ void pathtrace(uchar4* pbo, int frame, int iter)
     bool iterationComplete = false;
     while (!iterationComplete)
     {
-        CUDA_TIMER_RECORD(cudaTimer, "Start, Iter {}", depth+1);
+        if (depth > 0) {
+            CUDA_TIMER_RECORD(cudaTimer, "Start, Iter {}", depth+1);
+        }
 
         if (iter == MAX_ITERATIONS) {
             exit(0);
@@ -195,6 +201,8 @@ void pathtrace(uchar4* pbo, int frame, int iter)
                 pt_state.hst_scene->exr_width,
                 pt_state.hst_scene->exr_height
             );
+
+            CUDA_TIMER_RECORD(cudaTimer, "Sample Lights, Iter {}", depth+1);
         }
 
         if (PathTracerOptions::Get()->debug_bvh) {
@@ -207,6 +215,8 @@ void pathtrace(uchar4* pbo, int frame, int iter)
                 pt_state.hst_scene->geoms.size(),
                 pt_state.dev_intersections
             );
+
+            CUDA_TIMER_RECORD(cudaTimer, "Draw BVH, Iter {}", depth+1);
         }
         else {
             #if !OPTIX
@@ -221,6 +231,8 @@ void pathtrace(uchar4* pbo, int frame, int iter)
                     pt_state.dev_intersections
                 );
                 checkCUDAError("compute intersections");
+
+                CUDA_TIMER_RECORD(cudaTimer, "Compute Intersections, Iter {}", depth+1);
             #else // OPTIX
                 // time for some optix magic
                 Params optix_params = {};
@@ -246,12 +258,10 @@ void pathtrace(uchar4* pbo, int frame, int iter)
                 );
                 // fmt::println("OptixTrace Iteration {}", iter);
                 // end of optix magic
-                CUDA_TIMER_RECORD(cudaTimer, "Optix Compute Intersections");
+                CUDA_TIMER_RECORD(cudaTimer, "Optix Compute Intersections, Iter {}", depth+1);
             #endif //OPTIX
 
             depth++;
-
-            CUDA_TIMER_RECORD(cudaTimer, "Compute Intersections, Iter {}", depth);
 
             #if MATERIAL_SORTING
                 thrust::sort_by_key(
@@ -301,14 +311,14 @@ void pathtrace(uchar4* pbo, int frame, int iter)
                 pt_state.hst_scene->exr_height
             );
 
-            CUDA_TIMER_RECORD(cudaTimer, "Shade Path, Iter {}", depth);
+            CUDA_TIMER_RECORD(cudaTimer, "Shade + Compact, Iter {}", depth);
 
             if (compact_paths) {
                 cudaMemcpy(&num_paths, pt_state.dev_num_active_paths, sizeof(int), cudaMemcpyDeviceToHost);
                 std::swap(dev_path_indices, dev_next_path_indices);
                 checkCUDAError("stream compaction");
 
-                CUDA_TIMER_RECORD(cudaTimer, "Stream Compaction, Iter {}", depth);
+                CUDA_TIMER_RECORD(cudaTimer, "Path Count Readback, Iter {}", depth);
             }
         }
 
@@ -333,6 +343,13 @@ void pathtrace(uchar4* pbo, int frame, int iter)
     }
     
     // cudaTimer.report();
+
+    #if PROFILE
+        if (pt_state.guiData != NULL)
+        {
+            pt_state.guiData->TimerBars = cudaTimer.stage_bars();
+        }
+    #endif
 
     // printf("Total Iteration Elapsed Time: %f\n\n", cudaTimer.get_elapsed("Start, Iter 1", "End, Iter 8"));
 
