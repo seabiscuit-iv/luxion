@@ -284,10 +284,12 @@ void RenderImGui()
             ImGui::MenuItem("Analytics", nullptr, &app.showAnalytics);
             ImGui::EndMenu();
         }
-        if (ImGui::BeginMenu("Profiling")) {
-            ImGui::MenuItem("Stage Timings", nullptr, &app.showStageTimings, PROFILE != 0);
-            ImGui::EndMenu();
-        }
+        #if PROFILE
+            if (ImGui::BeginMenu("Profiling")) {
+                ImGui::MenuItem("Stage Timings", nullptr, &app.showStageTimings);
+                ImGui::EndMenu();
+            }
+        #endif
         ImGui::EndMainMenuBar();
     }
 
