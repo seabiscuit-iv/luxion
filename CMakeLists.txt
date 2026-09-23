@@ -144,6 +144,7 @@ target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE
     CUDA::cuda_driver
     CUDA::nvrtc
     CUDA::cudart_static
+    CUDA::nvml
 )
 
 include(CheckIPOSupported)

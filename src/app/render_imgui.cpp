@@ -23,6 +23,7 @@
 #include <cuda_gl_interop.h>
 
 #include <cstdlib>
+#include <cstdio>
 #include <cstring>
 #include <iostream>
 #include <fstream>
@@ -32,6 +33,10 @@
 #include <utility>
 #include <vector>
 #include "ImGui/imgui.h"
+
+#if PROFILE
+    #include <nvml.h>
+#endif
 #include "ImGui/imgui_impl_glfw.h"
 #include "ImGui/imgui_impl_opengl3.h"
 
@@ -168,6 +173,141 @@ void RenderStageTimings()
 }
 #endif
 
+#if PROFILE
+void DrawUsageGraph(const char* label, const char* value_text, const float* history, int count, int offset, ImU32 color)
+{
+    ImGui::TextUnformatted(label);
+    ImGui::SameLine(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(value_text).x);
+    ImGui::TextUnformatted(value_text);
+
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    const ImVec2 origin = ImGui::GetCursorScreenPos();
+    const ImVec2 size(ImGui::GetContentRegionAvail().x, 90.0f);
+    const ImVec2 corner(origin.x + size.x, origin.y + size.y);
+    ImGui::Dummy(size);
+
+    draw_list->AddRectFilled(origin, corner, ImGui::GetColorU32(ImGuiCol_FrameBg), 4.0f);
+
+    const ImU32 grid_color = ImGui::GetColorU32(ImGuiCol_Border, 0.5f);
+    for (int i = 1; i < 4; ++i) {
+        float y = origin.y + size.y * (i / 4.0f);
+        draw_list->AddLine(ImVec2(origin.x, y), ImVec2(corner.x, y), grid_color);
+    }
+
+    if (count < 2) {
+        return;
+    }
+
+    ImVec4 base = ImGui::ColorConvertU32ToFloat4(color);
+    const ImU32 fill_top = ImGui::ColorConvertFloat4ToU32(ImVec4(base.x, base.y, base.z, 0.45f));
+    const ImU32 fill_bottom = ImGui::ColorConvertFloat4ToU32(ImVec4(base.x, base.y, base.z, 0.02f));
+    const ImVec2 white_uv = ImGui::GetFontTexUvWhitePixel();
+
+    std::vector<ImVec2> points(count);
+    for (int i = 0; i < count; ++i) {
+        float value = history[(offset + i) % count];
+        value = value < 0.0f ? 0.0f : (value > 100.0f ? 100.0f : value);
+        points[i] = ImVec2(
+            origin.x + size.x * (float(i) / float(count - 1)),
+            corner.y - size.y * (value / 100.0f)
+        );
+    }
+
+    for (int i = 0; i + 1 < count; ++i) {
+        const ImVec2& a = points[i];
+        const ImVec2& b = points[i + 1];
+
+        draw_list->PrimReserve(6, 4);
+        ImDrawIdx idx = (ImDrawIdx)draw_list->_VtxCurrentIdx;
+        draw_list->PrimWriteIdx(idx);
+        draw_list->PrimWriteIdx(idx + 1);
+        draw_list->PrimWriteIdx(idx + 2);
+        draw_list->PrimWriteIdx(idx);
+        draw_list->PrimWriteIdx(idx + 2);
+        draw_list->PrimWriteIdx(idx + 3);
+        draw_list->PrimWriteVtx(a, white_uv, fill_top);
+        draw_list->PrimWriteVtx(b, white_uv, fill_top);
+        draw_list->PrimWriteVtx(ImVec2(b.x, corner.y), white_uv, fill_bottom);
+        draw_list->PrimWriteVtx(ImVec2(a.x, corner.y), white_uv, fill_bottom);
+    }
+
+    draw_list->AddPolyline(points.data(), count, color, ImDrawFlags_None, 2.0f);
+    draw_list->AddCircleFilled(points.back(), 3.5f, color);
+    draw_list->AddRect(origin, corner, ImGui::GetColorU32(ImGuiCol_Border), 4.0f);
+}
+
+void RenderGpuUtilization()
+{
+    AppState& app = AppState::Get();
+    if (!app.showGpuUtilization) {
+        return;
+    }
+
+    static bool nvml_tried = false;
+    static bool nvml_ready = false;
+    static nvmlDevice_t device = nullptr;
+    if (!nvml_tried) {
+        nvml_tried = true;
+        int cuda_device = 0;
+        char pci_bus_id[32] = {};
+        nvml_ready = nvmlInit_v2() == NVML_SUCCESS
+            && cudaGetDevice(&cuda_device) == cudaSuccess
+            && cudaDeviceGetPCIBusId(pci_bus_id, sizeof(pci_bus_id), cuda_device) == cudaSuccess
+            && nvmlDeviceGetHandleByPciBusId_v2(pci_bus_id, &device) == NVML_SUCCESS;
+    }
+
+    ImGui::Begin("GPU Utilization", &app.showGpuUtilization);
+
+    if (!nvml_ready) {
+        ImGui::TextDisabled("NVML unavailable");
+        ImGui::End();
+        return;
+    }
+
+    constexpr int history_size = 120;
+    static float gpu_history[history_size] = {};
+    static float vram_history[history_size] = {};
+    static int history_offset = 0;
+    static double last_sample_time = -1.0;
+    static unsigned int gpu_percent = 0;
+    static unsigned long long vram_used = 0;
+    static unsigned long long vram_total = 0;
+
+    double now = ImGui::GetTime();
+    if (now - last_sample_time >= 0.1) {
+        last_sample_time = now;
+
+        nvmlUtilization_t utilization;
+        if (nvmlDeviceGetUtilizationRates(device, &utilization) == NVML_SUCCESS) {
+            gpu_percent = utilization.gpu;
+        }
+
+        nvmlMemory_t memory;
+        if (nvmlDeviceGetMemoryInfo(device, &memory) == NVML_SUCCESS) {
+            vram_used = memory.used;
+            vram_total = memory.total;
+        }
+
+        gpu_history[history_offset] = float(gpu_percent);
+        vram_history[history_offset] = vram_total > 0 ? 100.0f * float(vram_used) / float(vram_total) : 0.0f;
+        history_offset = (history_offset + 1) % history_size;
+    }
+
+    const float gib = 1024.0f * 1024.0f * 1024.0f;
+    char value_text[64];
+
+    snprintf(value_text, sizeof(value_text), "%u%%", gpu_percent);
+    DrawUsageGraph("GPU", value_text, gpu_history, history_size, history_offset, IM_COL32(64, 196, 160, 255));
+
+    ImGui::Spacing();
+
+    snprintf(value_text, sizeof(value_text), "%.2f / %.2f GiB", float(vram_used) / gib, float(vram_total) / gib);
+    DrawUsageGraph("VRAM", value_text, vram_history, history_size, history_offset, IM_COL32(150, 120, 230, 255));
+
+    ImGui::End();
+}
+#endif
+
 bool RenderAnalytics()
 {
     AppState& app = AppState::Get();
@@ -287,6 +427,7 @@ void RenderImGui()
         #if PROFILE
             if (ImGui::BeginMenu("Profiling")) {
                 ImGui::MenuItem("Stage Timings", nullptr, &app.showStageTimings);
+                ImGui::MenuItem("GPU Utilization", nullptr, &app.showGpuUtilization);
                 ImGui::EndMenu();
             }
         #endif
@@ -297,6 +438,7 @@ void RenderImGui()
 
     #if PROFILE
         RenderStageTimings();
+        RenderGpuUtilization();
     #endif
 
     if (changed && !app.locked) {

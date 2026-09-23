@@ -28,6 +28,7 @@ struct AppState {
     bool hideImGui = false;
     bool showAnalytics = true;
     bool showStageTimings = false;
+    bool showGpuUtilization = false;
 
     bool camchanged = true;
     float dtheta = 0, dphi = 0;
