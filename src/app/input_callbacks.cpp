@@ -58,6 +58,10 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
                 saveImage();
                 break;
             case GLFW_KEY_SPACE:
+                if (app.locked)
+                {
+                    break;
+                }
                 app.camchanged = true;
                 app.renderState = &app.scene->state;
                 break;
@@ -87,7 +91,7 @@ void mousePositionCallback(GLFWwindow* window, double xpos, double ypos)
     double dx = xpos - app.lastX;
     double dy = ypos - app.lastY;
 
-    if (MouseOverImGuiWindow())
+    if (MouseOverImGuiWindow() || app.locked)
         goto end;
 
     // SHIFT + LEFT DRAG -> PAN
@@ -148,7 +152,7 @@ end:
 
 void scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
     AppState& app = AppState::Get();
-    if (MouseOverImGuiWindow()) return;
+    if (MouseOverImGuiWindow() || app.locked) return;
 
     // Sensitivity (tune this)
     const float zoomSpeed = 0.1f;

@@ -24,6 +24,8 @@ struct AppState {
     double lastX = 0.0;
     double lastY = 0.0;
 
+    bool locked = false;
+
     bool camchanged = true;
     float dtheta = 0, dphi = 0;
     glm::vec3 cammove = glm::vec3(0.0f);

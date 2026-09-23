@@ -84,7 +84,14 @@ void RenderImGui()
 
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
     ImGui::Text("Traced Depth %d", app.imguiData->TracedDepth);
-    
+
+    ImGui::Checkbox("Lock Settings & Camera", &app.locked);
+    if (app.locked) {
+        ImGui::TextDisabled("Locked: settings and camera frozen, render will not restart");
+    }
+
+    ImGui::BeginDisabled(app.locked);
+
     #if !OPTIX
         changed |= ImGui::Checkbox("Debug BVH", &PathTracerOptions::Get()->debug_bvh);
     #endif
@@ -148,9 +155,11 @@ void RenderImGui()
 
     changed |= ImGui::SliderFloat("Transmission", &app.scene->materials[PathTracerOptions::Get()->selected_material].transmission, 0.0f, 1.0f);
 
+    ImGui::EndDisabled();
+
     ImGui::End();
 
-    if (changed) {
+    if (changed && !app.locked) {
         app.scene->precompute_emissive_mesh_area();
         if (app.scene->total_emissive_mesh_area < EPSILON) {
             PathTracerOptions::Get()->direct_light_sampling = false;
