@@ -122,6 +122,10 @@ int main(int argc, char** argv)
         {
             PathTracerOptions::Get()->environment_map_importance_sampling = true;
         }
+        else if (strcmp(argv[i], "-lock") == 0)
+        {
+            app.locked = true;
+        }
         else
         {
             // Assume first non-flag argument is the scene file
@@ -138,7 +142,7 @@ int main(int argc, char** argv)
 
     if (!sceneFile)
     {
-        printf("Usage: %s SCENEFILE [-e|--envmap ENVMAP] [-i|--iterations N] [-o|--output NAME] [-dmis] [-emis]\n", argv[0]);
+        printf("Usage: %s SCENEFILE [-e|--envmap ENVMAP] [-i|--iterations N] [-o|--output NAME] [-dmis] [-emis] [-lock]\n", argv[0]);
         return 1;
     }
 
