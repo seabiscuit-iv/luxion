@@ -1,6 +1,7 @@
 #include "app/render_loop.h"
 
 #include "app/gl_resources.h"
+#include "app/input_callbacks.h"
 #include "app/render_imgui.h"
 #include "app/save_image.h"
 
@@ -39,9 +40,15 @@
 void mainLoop()
 {
     AppState& app = AppState::Get();
+    double lastFrameTime = glfwGetTime();
     while (!glfwWindowShouldClose(app.window))
     {
         glfwPollEvents();
+
+        double now = glfwGetTime();
+        float dt = float(now - lastFrameTime);
+        processKeyboardMovement(app.window, dt > 0.1f ? 0.1f : dt);
+        lastFrameTime = now;
 
         runCuda();
 

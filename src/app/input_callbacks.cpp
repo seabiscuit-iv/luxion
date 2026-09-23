@@ -13,6 +13,7 @@
 #include "utilities.h"
 #include "myoptix.h"
 #include "config.h"
+#include "ImGui/imgui.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtx/transform.hpp>
@@ -54,7 +55,7 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
                 saveImage();
                 glfwSetWindowShouldClose(window, GL_TRUE);
                 break;
-            case GLFW_KEY_S:
+            case GLFW_KEY_I:
                 saveImage();
                 break;
             case GLFW_KEY_SPACE:
@@ -66,6 +67,60 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
                 app.renderState = &app.scene->state;
                 break;
         }
+    }
+}
+
+void processKeyboardMovement(GLFWwindow* window, float dt)
+{
+    AppState& app = AppState::Get();
+    if (app.locked || app.io->WantCaptureKeyboard)
+    {
+        return;
+    }
+
+    auto keyDown = [window](int key) { return glfwGetKey(window, key) == GLFW_PRESS; };
+
+    Camera& cam = app.renderState->camera;
+
+    glm::vec3 move(0.0f);
+    if (keyDown(GLFW_KEY_W)) {
+        move += cam.view;
+    }
+    if (keyDown(GLFW_KEY_S)) {
+        move -= cam.view;
+    }
+    if (keyDown(GLFW_KEY_D)) {
+        move += cam.right;
+    }
+    if (keyDown(GLFW_KEY_A)) {
+        move -= cam.right;
+    }
+    if (keyDown(GLFW_KEY_E)) {
+        move += app.refUp;
+    }
+    if (keyDown(GLFW_KEY_Q)) {
+        move -= app.refUp;
+    }
+
+    if (move != glm::vec3(0.0f))
+    {
+        const float moveSpeed = 1.0f;
+        cam.lookAt += move * (app.zoom * moveSpeed * dt);
+        app.camchanged = true;
+    }
+
+    const float orbitSpeed = 1.5f;
+    float dphi = 0.0f, dtheta = 0.0f;
+    if (keyDown(GLFW_KEY_LEFT))  { dphi   -= orbitSpeed * dt; }
+    if (keyDown(GLFW_KEY_RIGHT)) { dphi   += orbitSpeed * dt; }
+    if (keyDown(GLFW_KEY_UP))    { dtheta -= orbitSpeed * dt; }
+    if (keyDown(GLFW_KEY_DOWN))  { dtheta += orbitSpeed * dt; }
+
+    if (dphi != 0.0f || dtheta != 0.0f)
+    {
+        app.phi += dphi;
+        app.theta = glm::clamp(app.theta + dtheta, 0.001f, PI - 0.001f);
+        app.camchanged = true;
     }
 }
 
