@@ -58,6 +58,12 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
             case GLFW_KEY_I:
                 saveImage();
                 break;
+            case GLFW_KEY_H:
+                if (!app.io->WantCaptureKeyboard)
+                {
+                    app.hideImGui = !app.hideImGui;
+                }
+                break;
             case GLFW_KEY_SPACE:
                 if (app.locked)
                 {

@@ -174,6 +174,13 @@ void RenderImGui()
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
+    if (app.hideImGui) {
+        app.mouseOverImGuiWinow = false;
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        return;
+    }
+
     ImGui::Begin("Path Tracer Analytics");
 
     ImGuiIO& io = ImGui::GetIO();
