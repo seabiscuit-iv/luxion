@@ -13,7 +13,7 @@ __constant__ Params params;
 static __forceinline__ __device__ void computeRay( uint3 idx, uint3 dim, float3& origin, float3& direction, float3& directlight_dir, float3& envmap_sample )
 {
 
-    OptixPathSegment& path_segment = params.path_segments[idx.x];
+    OptixPathSegment& path_segment = params.path_segments[params.path_indices[idx.x]];
 
     origin = path_segment.ray.origin;
     direction = path_segment.ray.direction;
@@ -54,7 +54,7 @@ extern "C" __global__ void __raygen__rg()
     const uint3 idx = optixGetLaunchIndex();
     const uint3 dim = optixGetLaunchDimensions();
 
-    if ( params.path_segments[idx.x].kill )
+    if ( params.path_segments[params.path_indices[idx.x]].kill )
     {
         params.shadeable_intersections[idx.x].t = -1.0f;
         params.direct_light_intersections[idx.x].t = -1.0f;
@@ -146,7 +146,7 @@ extern "C" __global__ void __raygen__rg()
 extern "C" __global__ void __miss__ms()
 {
     const uint3 idx = optixGetLaunchIndex();
-    const OptixPathSegment& path_segment = params.path_segments[idx.x];
+    const OptixPathSegment& path_segment = params.path_segments[params.path_indices[idx.x]];
     OptixShadeableIntersection& shadeable_intersection = params.shadeable_intersections[idx.x];
 
     shadeable_intersection.t = -1.0f;
@@ -160,7 +160,7 @@ extern "C" __global__ void __closesthit__ch()
     const unsigned int prim_ID = optixGetPrimitiveIndex();
 
     const uint3 idx = optixGetLaunchIndex();
-    const OptixPathSegment& path_segment = params.path_segments[idx.x];
+    const OptixPathSegment& path_segment = params.path_segments[params.path_indices[idx.x]];
     OptixShadeableIntersection& shadeable_intersection = params.shadeable_intersections[idx.x];
 
     int material_id = params.material_ids[object_ID];
@@ -247,7 +247,7 @@ extern "C" __global__ void __closesthit__ch()
 extern "C" __global__ void __miss__ms_direct_light()
 {
     const uint3 idx = optixGetLaunchIndex();
-    const OptixPathSegment& path_segment = params.path_segments[idx.x];
+    const OptixPathSegment& path_segment = params.path_segments[params.path_indices[idx.x]];
     OptixShadeableIntersection& shadeable_intersection = params.direct_light_intersections[idx.x];
 
     shadeable_intersection.t = -1.0f;

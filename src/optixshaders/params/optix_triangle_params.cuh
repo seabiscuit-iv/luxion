@@ -77,6 +77,7 @@ struct Params
 {
     OptixTraversableHandle handle;
     OptixPathSegment* path_segments;
+    int* path_indices;
     float3* debug_image;
     OptixShadeableIntersection* shadeable_intersections;    
     OptixShadeableIntersection* direct_light_intersections;    

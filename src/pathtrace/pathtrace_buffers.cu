@@ -29,8 +29,7 @@ void pathtraceInit(Scene* scene)
     cudaMalloc(&pt_state.dev_image, pixelcount * sizeof(glm::vec3));
     cudaMemset(pt_state.dev_image, 0, pixelcount * sizeof(glm::vec3));
 
-    cudaMalloc(&pt_state.dev_paths_A, pixelcount * sizeof(PathSegment));
-    cudaMalloc(&pt_state.dev_paths_B, pixelcount * sizeof(PathSegment));
+    cudaMalloc(&pt_state.dev_paths, pixelcount * sizeof(PathSegment));
 
     cudaMalloc(&pt_state.dev_geoms, scene->geoms.size() * sizeof(Geom));
     cudaMemcpy(pt_state.dev_geoms, scene->geoms.data(), scene->geoms.size() * sizeof(Geom), cudaMemcpyHostToDevice);
@@ -49,7 +48,9 @@ void pathtraceInit(Scene* scene)
 
     cudaMalloc(&pt_state.dev_morton_codes, pixelcount * sizeof(uint32_t));
 
-    cudaMalloc(&pt_state.dev_path_scatter_buf, pixelcount * sizeof(int));
+    cudaMalloc(&pt_state.dev_path_indices_A, pixelcount * sizeof(int));
+    cudaMalloc(&pt_state.dev_path_indices_B, pixelcount * sizeof(int));
+    cudaMalloc(&pt_state.dev_num_active_paths, sizeof(int));
 
     cudaMalloc( reinterpret_cast<void**>( &pt_state.d_optix_paramters ), sizeof( Params ) );
 
@@ -142,8 +143,7 @@ void pathtraceFree()
 {
     PathTraceState& pt_state = PathTraceState::Get();
     cudaFree(pt_state.dev_image);
-    cudaFree(pt_state.dev_paths_A);
-    cudaFree(pt_state.dev_paths_B);
+    cudaFree(pt_state.dev_paths);
     cudaFree(pt_state.dev_geoms);
     cudaFree(pt_state.dev_materials);
     cudaFree(pt_state.dev_intersections);
@@ -151,7 +151,9 @@ void pathtraceFree()
     cudaFree(pt_state.dev_environment_map_intersections);
 
     cudaFree(pt_state.dev_morton_codes);
-    cudaFree(pt_state.dev_path_scatter_buf);
+    cudaFree(pt_state.dev_path_indices_A);
+    cudaFree(pt_state.dev_path_indices_B);
+    cudaFree(pt_state.dev_num_active_paths);
     cudaFree(pt_state.dev_material_ids);
     cudaFree(pt_state.dev_alpha_materials);
 

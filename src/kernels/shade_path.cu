@@ -16,6 +16,9 @@
 
 #include <glm/gtx/norm.hpp>
 #include <thrust/random.h>
+#include <cooperative_groups.h>
+
+namespace cg = cooperative_groups;
 
 #define M_PI 3.14159
 #define GLASS_EPSILON 0.01f
@@ -92,6 +95,9 @@ __global__ void shadePath(
     int iter,
     int num_paths,
     PathSegment* __restrict__ pathSegments,
+    const int* __restrict__ pathIndices,
+    int* __restrict__ nextPathIndices,
+    int* __restrict__ numNextPaths,
     Material* __restrict__ materials,
     ShadeableIntersection* __restrict__ shadeableIntersections,
     ShadeableIntersection* __restrict__ directLightIntersections,
@@ -121,7 +127,8 @@ __global__ void shadePath(
     ShadeableIntersection &intersection = shadeableIntersections[idx];
     ShadeableIntersection &direct_light_intersection = directLightIntersections[idx];
     ShadeableIntersection &env_map_intersesction = has_exr ? environmentMapIntersections[idx] : default_isect;
-    PathSegment &path = pathSegments[idx];
+    const int path_index = pathIndices[idx];
+    PathSegment &path = pathSegments[path_index];
 
     thrust::default_random_engine rng = makeSeededRandomEngine(iter, path.pixelIndex, depth);
 
@@ -343,5 +350,15 @@ __global__ void shadePath(
         else {
             ray.origin = hit_point - (normal * GLASS_EPSILON);
         }   
+    }
+
+    if (nextPathIndices != nullptr && !path.kill) {
+        cg::coalesced_group active = cg::coalesced_threads();
+        int base = 0;
+        if (active.thread_rank() == 0) {
+            base = atomicAdd(numNextPaths, (int)active.size());
+        }
+        base = active.shfl(base, 0);
+        nextPathIndices[base + active.thread_rank()] = path_index;
     }
 }

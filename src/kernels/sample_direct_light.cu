@@ -10,6 +10,7 @@ __global__ void sampleDirectLight(
     int iter,
     int num_paths,
     PathSegment* pathSegments,
+    const int* __restrict__ pathIndices,
     int depth,
     int num_emissive_geoms,
     int* emissive_geoms,
@@ -28,7 +29,7 @@ __global__ void sampleDirectLight(
         return;
     }
 
-    PathSegment& path = pathSegments[idx];
+    PathSegment& path = pathSegments[pathIndices[idx]];
     if (path.kill)
     {
         return;

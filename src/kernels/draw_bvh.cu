@@ -7,6 +7,7 @@ __global__ void drawBVH(
     int depth,
     int num_paths,
     PathSegment* __restrict__ pathSegments,
+    const int* __restrict__ pathIndices,
     const Geom* __restrict__ geoms,
     int geoms_size,
     ShadeableIntersection* __restrict__ intersections)
@@ -15,7 +16,7 @@ __global__ void drawBVH(
 
     if (path_index < num_paths)
     {
-        PathSegment &pathSegment = pathSegments[path_index];
+        PathSegment &pathSegment = pathSegments[pathIndices[path_index]];
 
         int count = 0;
 

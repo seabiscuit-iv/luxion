@@ -12,6 +12,7 @@ __global__ void sampleDirectLight(
     int iter,
     int num_paths,
     PathSegment* pathSegments,
+    const int* __restrict__ pathIndices,
     int depth,
     int num_emissive_geoms,
     int* emissive_geoms,

@@ -7,6 +7,7 @@ __global__ void computeIntersections(
     int depth,
     int num_paths,
     const PathSegment* __restrict__ pathSegments,
+    const int* __restrict__ pathIndices,
     const Geom* __restrict__ geoms,
     int geoms_size,
     ShadeableIntersection* __restrict__ intersections)
@@ -15,7 +16,7 @@ __global__ void computeIntersections(
 
     if (path_index < num_paths)
     {
-        const PathSegment pathSegment = pathSegments[path_index];
+        const PathSegment pathSegment = pathSegments[pathIndices[path_index]];
         ShadeableIntersection isect = intersections[path_index];
 
         float t;

@@ -5,7 +5,7 @@
 
 #include <thrust/random.h>
 
-__global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, PathSegment* __restrict__ pathSegments)
+__global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, PathSegment* __restrict__ pathSegments, int* __restrict__ pathIndices)
 {
     int x = (blockIdx.x * blockDim.x) + threadIdx.x;
     int y = (blockIdx.y * blockDim.y) + threadIdx.y;
@@ -34,5 +34,6 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
             - (cam.up    * cam.pixelLength.y * pY)
         );
         segment.pixelIndex = index;
+        pathIndices[index] = index;
     }
 }

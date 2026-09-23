@@ -10,7 +10,7 @@
 #define MAX_ITERATIONS -1
 
 // Bump the shader version to recompile shaders. We need a better solution for this
-#define SHADER_VER 2.8
+#define SHADER_VER 2.9
 
 #define DRAW_BVH 0
 

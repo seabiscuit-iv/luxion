@@ -18,8 +18,7 @@ struct PathTraceState {
     glm::vec3* dev_image = nullptr;
     Geom* dev_geoms = nullptr;
     Material* dev_materials = nullptr;
-    PathSegment* dev_paths_A = nullptr;
-    PathSegment* dev_paths_B = nullptr;
+    PathSegment* dev_paths = nullptr;
     ShadeableIntersection* dev_intersections = nullptr;
     ShadeableIntersection* dev_direct_light_intersections = nullptr;
     ShadeableIntersection* dev_environment_map_intersections = nullptr;
@@ -36,7 +35,9 @@ struct PathTraceState {
     CUdeviceptr d_optix_paramters = 0;
 
     uint32_t* dev_morton_codes = nullptr;
-    int* dev_path_scatter_buf = nullptr;
+    int* dev_path_indices_A = nullptr;
+    int* dev_path_indices_B = nullptr;
+    int* dev_num_active_paths = nullptr;
 
     cudaArray_t dev_exr_array = nullptr;
     cudaTextureObject_t exr_texture = 0;

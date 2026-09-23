@@ -3,12 +3,12 @@
 #include "morton_codes.h"
 #include "common.h"
 
-__global__ void intersectionPrecompute(int n, PathSegment* __restrict__ pathSegments, const Geom* mesh, uint32_t* morton_codes) {
+__global__ void intersectionPrecompute(int n, PathSegment* __restrict__ pathSegments, const int* __restrict__ pathIndices, const Geom* mesh, uint32_t* morton_codes) {
     int path_index = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (path_index < n)
     {
-        Ray r = pathSegments[path_index].ray;
+        Ray r = pathSegments[pathIndices[path_index]].ray;
 
         r.origin = glm::vec3(mesh->inverseTransform * glm::vec4(r.origin, 1.0f));
         r.direction = glm::vec3(mesh->inverseTransform * glm::vec4(r.direction, 0.0f));
