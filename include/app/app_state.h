@@ -26,6 +26,8 @@ struct AppState {
 
     bool locked = false;
     bool hideImGui = false;
+    bool showAnalytics = true;
+    bool showStageTimings = false;
 
     bool camchanged = true;
     float dtheta = 0, dphi = 0;

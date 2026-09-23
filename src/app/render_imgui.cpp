@@ -109,7 +109,11 @@ void RenderStageTimings()
         return color;
     };
 
-    ImGui::Begin("Stage Timings");
+    if (!app.showStageTimings) {
+        return;
+    }
+
+    ImGui::Begin("Stage Timings", &app.showStageTimings);
 
     if (bars.empty()) {
         ImGui::TextDisabled("No timing data");
@@ -164,27 +168,14 @@ void RenderStageTimings()
 }
 #endif
 
-// LOOK: Un-Comment to check ImGui Usage
-void RenderImGui()
+bool RenderAnalytics()
 {
     AppState& app = AppState::Get();
-    app.mouseOverImGuiWinow = app.io->WantCaptureMouse;
-
-    ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
-
-    if (app.hideImGui) {
-        app.mouseOverImGuiWinow = false;
-        ImGui::Render();
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-        return;
+    if (!app.showAnalytics) {
+        return false;
     }
 
-    ImGui::Begin("Path Tracer Analytics");
-
-    ImGuiIO& io = ImGui::GetIO();
-    io.FontGlobalScale = 1.2f;
+    ImGui::Begin("Path Tracer Analytics", &app.showAnalytics);
 
     bool changed = false;
 
@@ -264,6 +255,43 @@ void RenderImGui()
     ImGui::EndDisabled();
 
     ImGui::End();
+
+    return changed;
+}
+
+// LOOK: Un-Comment to check ImGui Usage
+void RenderImGui()
+{
+    AppState& app = AppState::Get();
+    app.mouseOverImGuiWinow = app.io->WantCaptureMouse;
+
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+    if (app.hideImGui) {
+        app.mouseOverImGuiWinow = false;
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        return;
+    }
+
+    ImGuiIO& io = ImGui::GetIO();
+    io.FontGlobalScale = 1.2f;
+
+    if (ImGui::BeginMainMenuBar()) {
+        if (ImGui::BeginMenu("General")) {
+            ImGui::MenuItem("Analytics", nullptr, &app.showAnalytics);
+            ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("Profiling")) {
+            ImGui::MenuItem("Stage Timings", nullptr, &app.showStageTimings, PROFILE != 0);
+            ImGui::EndMenu();
+        }
+        ImGui::EndMainMenuBar();
+    }
+
+    bool changed = RenderAnalytics();
 
     #if PROFILE
         RenderStageTimings();
