@@ -114,6 +114,14 @@ int main(int argc, char** argv)
             }
             app.outputName = argv[++i];
         }
+        else if (strcmp(argv[i], "-dmis") == 0)
+        {
+            PathTracerOptions::Get()->direct_light_sampling = true;
+        }
+        else if (strcmp(argv[i], "-emis") == 0)
+        {
+            PathTracerOptions::Get()->environment_map_importance_sampling = true;
+        }
         else
         {
             // Assume first non-flag argument is the scene file
@@ -130,7 +138,7 @@ int main(int argc, char** argv)
 
     if (!sceneFile)
     {
-        printf("Usage: %s SCENEFILE [-e|--envmap ENVMAP] [-i|--iterations N] [-o|--output NAME]\n", argv[0]);
+        printf("Usage: %s SCENEFILE [-e|--envmap ENVMAP] [-i|--iterations N] [-o|--output NAME] [-dmis] [-emis]\n", argv[0]);
         return 1;
     }
 
@@ -139,6 +147,19 @@ int main(int argc, char** argv)
 
     // Load scene file
     app.scene = new Scene(sceneFile, env_map_path);
+
+    if (PathTracerOptions::Get()->direct_light_sampling &&
+        (app.scene->emissive_geoms.empty() || app.scene->total_emissive_mesh_area < EPSILON))
+    {
+        printf("Error: -dmis requires the scene to contain emissive geometry\n");
+        return 1;
+    }
+
+    if (PathTracerOptions::Get()->environment_map_importance_sampling && app.scene->exr_data.empty())
+    {
+        printf("Error: -emis requires an environment map, pass one with -e\n");
+        return 1;
+    }
 
     // Set up camera stuff from loaded path tracer settings
     app.iteration = 0;
