@@ -29,6 +29,10 @@ __global__ void sampleDirectLight(
     }
 
     PathSegment& path = pathSegments[idx];
+    if (path.kill)
+    {
+        return;
+    }
 
     thrust::default_random_engine rng = makeSeededRandomEngine(iter, path.pixelIndex, depth);
     

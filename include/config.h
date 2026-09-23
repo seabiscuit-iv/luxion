@@ -1,7 +1,7 @@
 // CONFIGURATION
 #define STREAM_COMPACTION 1
 #define MATERIAL_SORTING 0  // enable this if you have a high number of materials
-#define RAY_SORTING 1       // morton-sort rays for coherence
+#define RAY_SORTING 0       // morton-sort rays for coherence
 #define PROFILE 0           // per-stage cuda event timing
 
 #define RUSSIAN_ROULETTE_MIN_DEPTH 3
@@ -16,9 +16,9 @@
 
 #define OPTIX 1
 
-#define ENABLE_BOX_INTERSECTION     1
+#define ENABLE_BOX_INTERSECTION     0
 #define ENABLE_SPHERE_INTERSECTION  0
-#define ENABLE_MESH_INTERSECTION    1
+#define ENABLE_MESH_INTERSECTION    0
 
 #define UBER_SHADER 1
 

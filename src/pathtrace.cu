@@ -11,6 +11,10 @@
 #include <thrust/gather.h>
 #include <thrust/sort.h>
 #include <thrust/sequence.h>
+#include <thrust/system/cuda/execution_policy.h>
+
+#include <map>
+#include <new>
 
 #include "sceneStructs.h"
 #include "scene.h"
@@ -50,6 +54,39 @@
 #include "shaders/specular.h"
 #include "shaders/cook_torrance.h"
 #include "shaders/glass.h"  
+
+struct ThrustCachingAllocator
+{
+    typedef char value_type;
+
+    std::multimap<std::ptrdiff_t, char*> free_blocks;
+    std::map<char*, std::ptrdiff_t> allocated_blocks;
+
+    char* allocate(std::ptrdiff_t num_bytes)
+    {
+        char* ptr = nullptr;
+        auto free_block = free_blocks.lower_bound(num_bytes);
+        if (free_block != free_blocks.end()) {
+            num_bytes = free_block->first;
+            ptr = free_block->second;
+            free_blocks.erase(free_block);
+        }
+        else if (cudaMalloc(reinterpret_cast<void**>(&ptr), num_bytes) != cudaSuccess) {
+            throw std::bad_alloc();
+        }
+        allocated_blocks.emplace(ptr, num_bytes);
+        return ptr;
+    }
+
+    void deallocate(char* ptr, size_t)
+    {
+        auto it = allocated_blocks.find(ptr);
+        free_blocks.emplace(it->second, it->first);
+        allocated_blocks.erase(it);
+    }
+};
+
+static ThrustCachingAllocator thrust_allocator;
 
 
 
@@ -158,10 +195,10 @@ void pathtrace(uchar4* pbo, int frame, int iter)
 
             CUDA_TIMER_RECORD(cudaTimer, "Morton Precompute, Iter {}", depth+1);
 
-            thrust::sequence(dPtr(pt_state.dev_path_scatter_buf), dPtr(pt_state.dev_path_scatter_buf) + num_paths);
-            thrust::sort_by_key(dPtr(pt_state.dev_morton_codes), dPtr(pt_state.dev_morton_codes + num_paths), dPtr(pt_state.dev_path_scatter_buf));
-            thrust::gather(dPtr(pt_state.dev_path_scatter_buf), dPtr(pt_state.dev_path_scatter_buf + num_paths), dPtr(dev_paths), dPtr(dev_paths_sorted));
-            thrust::copy(dPtr(dev_paths + num_paths), dPtr(dev_paths + last_num_paths), dPtr(dev_paths_sorted + num_paths));
+            thrust::sequence(thrust::cuda::par(thrust_allocator), dPtr(pt_state.dev_path_scatter_buf), dPtr(pt_state.dev_path_scatter_buf) + num_paths);
+            thrust::sort_by_key(thrust::cuda::par(thrust_allocator), dPtr(pt_state.dev_morton_codes), dPtr(pt_state.dev_morton_codes + num_paths), dPtr(pt_state.dev_path_scatter_buf));
+            thrust::gather(thrust::cuda::par(thrust_allocator), dPtr(pt_state.dev_path_scatter_buf), dPtr(pt_state.dev_path_scatter_buf + num_paths), dPtr(dev_paths), dPtr(dev_paths_sorted));
+            thrust::copy(thrust::cuda::par(thrust_allocator), dPtr(dev_paths + num_paths), dPtr(dev_paths + last_num_paths), dPtr(dev_paths_sorted + num_paths));
 
             CUDA_TIMER_RECORD(cudaTimer, "Sort Mesh Hits Morton, Iter {}", depth+1);
         #endif
@@ -224,7 +261,7 @@ void pathtrace(uchar4* pbo, int frame, int iter)
                 optix_params.uv_buffer_locations = (float2**)pt_state.dev_uv_buffer_locs;
                 optix_params.direct_light_sampling = PathTracerOptions::Get()->direct_light_sampling;
                 optix_params.envmap_sampling = PathTracerOptions::Get()->environment_map_importance_sampling;
-                cudaMemcpy(reinterpret_cast<void*>(pt_state.d_optix_paramters), &optix_params, sizeof(Params), cudaMemcpyHostToDevice);
+                cudaMemcpyAsync(reinterpret_cast<void*>(pt_state.d_optix_paramters), &optix_params, sizeof(Params), cudaMemcpyHostToDevice, 0);
                 OPTIX_CHECK(
                     optixLaunch(pt_state.hst_scene->optix_pipeline, 0, pt_state.d_optix_paramters, sizeof(Params), &pt_state.hst_scene->optix_sbt, num_paths, 1, 1);
                 );
@@ -239,7 +276,7 @@ void pathtrace(uchar4* pbo, int frame, int iter)
 
             #if MATERIAL_SORTING
                 thrust::sort_by_key(
-                    thrust::device,
+                    thrust::cuda::par(thrust_allocator),
                     pt_state.dev_intersections,
                     pt_state.dev_intersections + num_paths,
                     dev_paths_sorted,
@@ -280,8 +317,8 @@ void pathtrace(uchar4* pbo, int frame, int iter)
         }
 
         #if STREAM_COMPACTION
-            if (!iterationComplete && !PathTracerOptions::Get()->debug_bvh) {
-                auto new_end = thrust::partition(dPtr(dev_paths_sorted), dPtr(dev_paths_sorted) + num_paths, path_terminated());
+            if (!iterationComplete && !PathTracerOptions::Get()->debug_bvh && depth >= RUSSIAN_ROULETTE_MIN_DEPTH) {
+                auto new_end = thrust::partition(thrust::cuda::par(thrust_allocator), dPtr(dev_paths_sorted), dPtr(dev_paths_sorted) + num_paths, path_terminated());
                 last_num_paths = num_paths;
                 num_paths = new_end - dPtr(dev_paths_sorted);
                 checkCUDAError("thrust::partition");
