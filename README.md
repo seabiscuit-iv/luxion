@@ -1,237 +1,207 @@
-CUDA Path Tracer
+Luxion
 ================
 
-**University of Pennsylvania, CIS 565: GPU Programming and Architecture, Project 3**
+An advanced glTF GPU path tracer built with CUDA and OptiX.
 
-* Saahil Gupta
-  * [LinkedIn](https://www.linkedin.com/in/saahil-g), [personal website](https://www.saahil-gupta.com)
-* Tested on: Windows 11 10.0.26100, AMD Ryzen 9 7940HS @ 4.0GHz 32GB, RTX 4060 Laptop GPU 8GB
+- **Saahil Gupta**
+  - [Website](https://www.saahil-gupta.com)
+  - [LinkedIn](https://www.linkedin.com/in/saahil-g)
+  - [X](https://x.com/cbizcuit)
 
-<div align="center">
+<p align="center">
+  <img src="img/erfan-kitchen.png" alt="Kitchen" width="100%">
+</p>
 
-![lucy](img/lucy_party_final.png)
-<em>"Lucy's Dance Party"</em>
+## Gallery
 
-</div>
+<p align="center">
+  <img src="img/canon.png" alt="Canon" width="49%">
+  <img src="img/best/living_room_kitchen.png" alt="Living room and kitchen" width="49%">
+</p>
+<p align="center">
+  <img src="img/living_room_front_page.png" alt="Living room" width="49%">
+  <img src="img/best/interior_apartment.png" alt="Interior apartment" width="49%">
+</p>
+<p align="center">
+  <img src="img/breakfast_room_display_img.png" alt="Breakfast room" width="49%">
+  <img src="img/best/bus_traveler.png" alt="Bus traveler" width="49%">
+</p>
 
 
-## Table of Contents
+## Rendering
 
-- [Overview](#overview)
-  - [Code Structure](#code-structure)
-- [Features](#features)
-  - [Materials](#materials)
-    - [Lambertian Diffuse](#lambertian-diffuse)
-    - [Perfectly Specular](#perfect-specular-reflection)
-    - [Cook-Torrance PBR](#cook-torrance-pbr-material)
-  - [Scene and Geometry Handling](#scene-and-geometry-handling)
-    - [Triangle Mesh Rendering](#triangle-mesh-rendering)
-    - [OBJ Model Importing](#obj-model-importing)
-    - [Custom Normal Buffers](#custom-normal-buffers)
-  - [Acceleration Structures](#acceleration-structures)
-    - [Bounding Volume Hierarchy](#bounding-volume-hierarchy)
-      - [Construction](#construction)
-      - [Traversal](#traversal)
-    - [Surface Area Heuristic](#surface-area-heuristic)
-      - [Binning](#binning)
-      - [Traversal Optimizations](#traversal-optimizations)
-    - [Stack Height Optimization](#stack-height-optimization)
-  - [Rendering Pipeline Improvements](#rendering-pipeline-improvements)
-    - [Terminated Path Partitioning](#terminated-path-partitioning)
-    - [Material Sorting](#material-sorting)
-- Performance Analysis
-  - Bounding Volume Hierarchy
-  - Terminated Path Partitioning
-  - Material Sorting
-- Renders
-- Future Goals
-- Miscallaneous Lessons
-  - Firefly Reduction
-  - FPU Operation Intrinsics
-  - Caching Division Values
-- References
+### Hardware Acceleration
 
-<br/>
+Luxion traces rays with **NVIDIA OptiX**, utilizing the RT cores on RTX GPUs for BVH traversal and triangle intersection. Each mesh gets its own compacted GAS, which all sit under a IAS.
 
-# Overview
+Every bounce, OptiX traces at most three kinds of rays per path:
+- BSDF indirect light ray
+- Direct light shadow ray
+- Environment map shadow ray
 
-This project is a **CUDA-accelerated [path tracer](https://en.wikipedia.org/wiki/Path_tracing)** which simulates global illumination through physically-based lighting and material techniques, with the goal of generating photorealistic renders. It presents various features, including **physically-based materials**, **custom 3D model loading**, and an efficient **BVH geometry acceleration structure** with surface-area based construction for high-performance traversal. The renderer itself incorporates **stochastic sampled anti-aliasing**, **path partitioning** for active ray optimization, and various other rendering optimizations. These optimizations allow it to render extremely dense scenes like the **Stanford Dragon** (800K triangles) in complex lighting scenarios, all within a reasonable amount of time while maintaining physically accurate light transport. Most scenes converge at about **400 iterations**, but for best results, it's good to let the path tracer run at least **5000 iterations**.
+Alpha-masked and alpha-blended materials are handled in an **any-hit program**, which samples the material's alpha and either rejects the hit (mask) or keeps it with probability of alpha (blend).
 
-## Code Structure
+### Materials
 
-Code is available in `src/`. Each file generally has a `.h` and `.cu`/`.cpp` pair. The following files are of notable importance:
+All materials go through a single **Cook-Torrance Uber-shader**, with the following parameters:
+- Albedo
+- Roughness
+- Metallic
+- Emission
+- Transmission
+- Alpha
+- IOR
 
-```py
-project-root/
-├── shaders/
-│   ├── lambert.cu              # Diffuse BRDF, PDF, Sampling function
-│   ├── specular.cu             # Reflection BRDF, mirror sampling
-│   └── cook_torrance.cu        # Microfacet BRDF, GGX sampling
-├── common.cu               # Useful CUDA-specific macros
-├── intersections.cu        # Intersection logic for primitives, BVH traversal
-├── mesh.cu                 # Mesh struct, BVH construction
-├── pathtrace.cu            # The main pathtracer loop and kernels
-├── stack.cu                # A device-side compile-time register stack
-├── scene.cpp               # Handles parsing .json scenes and mesh loading
-├── sceneStructs.h          # Structs for pathtracer elements e.g. Ray, PathSegment 
-└── main.cpp
+These parameters are implemented through three sampling lobes:
+- **GGX (Trowbridge-Reitz) microfacet BRDF** for specular reflection.
+- **Lambertian diffuse BRDF** for non-metals.
+- **Microfacet transmission GGX BTDF** covers rough and smooth glass refraction.
+
+Our fresnel is computed through **Schlick Fresnel approximation** and **IOR-based Dielectric Fresnel**, which are blended by *metallic*.
+
+Supported textures are base color, normal, metallic-roughness, and emission, which spans the set of all material parameters apart from transmission.
+
+// image: material showcase (rough -> smooth, dielectric -> metal, glass)
+
+### Importance Sampling
+
+- **Next-event estimation:** At each non-specular hit, Luxion samples a point on an emissive mesh by picking a mesh through a CDF over total emissive area, then a triangle within that mesh by area, then a uniform point on that triangle.
+- **HDRI environment importance sampling:** The environment map is turned into a 2D distribution: a marginal CDF over rows and a conditional CDF per row, weighted by each pixel's brightness and $\sin \theta$. 
+- Both are combined with BSDF sampling using **MIS** and the power heuristic.
+
+// image: naive vs NEE vs NEE + MIS at equal sample count
+
+### Optimizations
+
+- **Wavefront path tracing:** each bounce is split into separate kernels and stages
+- **Stream compaction via atomic index queue:**
+  - `shadePath` appends each surviving path's index to a queue for the next bounce.
+  - Survivors are pushed with a warp-aggregated `atomicAdd`.
+  - Later bounces only launch threads for live paths.
+- **Caching Thrust allocator:** temporary buffers are reused across calls instead of reallocating.
+
+// graph: frame time per bounce with / without compaction
+
+### Scene Loading
+
+Scenes are loaded from **glTF 2.0** (`.glb`) with tinygltf:
+- **Cameras:** the scene's glTF camera is used as the starting view.
+- **Materials and textures** are mapped onto the uber-shader as described above.
+- **Emissive meshes** are gathered into the area-weighted light list for NEE automatically.
+- **HDRI environment maps** are loaded from `.exr` files.
+- Textures support texture transforms with `KHR_texture_transform`
+- Material parameters use extensions `KHR_materials_emissive_strength`, `KHR_materials_ior`, and `KHR_materials_transmission`
+
+### Additional
+
+- Reinhard, AgX and ACES tonemapping
+- ImGUI UI for live scene editing, analytics, and profiling data
+- Software BVH with binning-SAH construction (*deprecated*)
+- Material sorting (*deprecated*)
+- JSON scene loading (*deprecated*)
+- Ray Morton encoding (*deprecated*)
+- Additional material types (*deprecated*)
+  - Perfect Lambertian
+  - Perfect Specular
+  - Perfect Glass
+
+## Usage
+
+```
+luxion SCENEFILE [-e|--envmap ENVMAP] [-i|--iterations N] [-o|--output NAME] [-dmis] [-emis] [-lock]
 ```
 
-`scenes/` contains a few scenes specified in a JSON format. Some of them reference obj models, which exist in `obj/`.
-
-<br/>
-
-# Features
-
-This path tracer contains a number of advanced features to improve **visual fidelity**, **frame time**, and **convergence time**.
-
-## Materials
-
-### Lambertian Diffuse
-
-
-<div align="center">
-
-![dragon](img/dragon_5000samp.png)
-<em>Stanford Dragon 800K, Lambertian Diffuse</em>
-
-</div>
-
-A very simple diffuse material BRDF based on [lambertian reflectance](https://en.wikipedia.org/wiki/Lambertian_reflectance). The general idea behind the Lambert shading model is that illumination is inversely related to the cosine of the angle between the surface normal and the incoming light ray, and is independent of the azimuthal angle of the light ray and view ray. Some examples of materials represented well by Lambertian reflectance include **paper, concrete, wood, and paint**.
-
-The Lambert BRDF is only dependent on albedo, so the sampling method we use is simply cosine-weighted hemisphere sampling about the surface normal (to balance out [Lambert's law](https://en.wikipedia.org/wiki/Beer%E2%80%93Lambert_law)). The PDF is just $\frac{cos(\theta)}{\pi}$.
-
-The code for this material's BRDF, PDF, sampling and shading logic can be found in `shaders/lambert.cu`. 
-
-### Perfect Specular Reflection
-
-<div align="center">
-
-![specular monkey](img/ultra_specular_monkey.png )
-<em>Suzanne Monkey, Perfectly Specular</em>
-
-</div>
-
-[Perfectly specular reflection](https://pbr-book.org/3ed-2018/Reflection_Models/Specular_Reflection_and_Transmission) is essentially a **mirror**, where any light that comes in is reflected perfectly across the surface normal and not distributed at all. As a result, this material has no editable properties outside of albedo.
-
-The PDF for a mirror would be infinity for the reflected direction of our view vector across the surface normal, and zero everywhere else. This is called a [Dirac delta distribution](https://en.wikipedia.org/wiki/Dirac_delta_function). Similarly, the BRDF ends up also being a Dirac delta distribution. We only trace the reflected ray (since every other ray has no contribution), and so in our code, we omit the infinite values and simply multiply by our surface color. Note that we don't need to multiply by the Lambertian term because the BRDF for perfect specular already includes the cosine implicitly in its definition of a Dirac delta.
-
-The code for this material's BRDF, PDF, sampling and shading logic can be found in `shaders/specular.cu`. 
-
-### Cook-Torrance PBR Material
-
-<div align="center">
-
-![cook torrance pbr](img/microfacet_balls_white.png )
-<em>Metallic vs Non-metallic, increasing Roughness</em>
-
-</div>
-
-Lambertian and perfectly specular materials represent the two ends of the diffuse-specular spectrum of materials. However, most surfaces tend to fall somewhere in the middle, having a somewhat distributed yet still concentrated reflection lobe. This is what creates the rough and blurry reflections that are visible on polished and metallic surfaces.
-
-To represent this on metallic materials, we use the [Cook-Torrance microfacet model](https://graphicscompendium.com/gamedev/15-pbr), which consists of a number of infinitely small perfectly specular mirrors, all angled a random distance away from the surface macro-normal. Computing the BRDF and PDF for this model requires the use of various other credited formulas:
-
-- Trowbridge-Reitz Normal Distribution Function (NDF)
-- [Schlick Fresnel Approximation](https://en.wikipedia.org/wiki/Schlick%27s_approximation)
-- Smith GGX Microfacet Geometry Model
-
-For non-metallic materials, we use the [Dieletric model](https://www.pbr-book.org/4ed/Reflection_Models/Dielectric_BSDF), which similarly uses a roughness value to shift between a clearcoat surface and a more standard diffuse surface. 
-
-Finally to combine these two, we use the material's metallic value to adjust the Fresnel term between the standard Dieletric value of ~0.04, and the Schlick approximation we use for metallics. In our sampling function, we also use the metallic value to adjust a probability value `probSpecular`, which decides the probability of our ray importance sampling either the dieletric or microfacet surface. 
-
-Combining these two gives us a standard PBR material that can be controlled by its albedo, roughness, and metallic values. 
-
-The code for this material's BRDF, PDF, sampling and shading logic can be found in `shaders/cook_torrance.cu`. 
-
-## Scene and Geometry Handling
-
-### Triangle Mesh Rendering
-
-In order to support custom model loading, simple triangle mesh rendering was added early in the project, following the [Möller–Trumbore intersection algorithm](https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm). Originally this would naively loop through all triangles, but this system would eventually be replaced by a high-performant bounding volume hierarchy.
-
-### OBJ Model Importing
-
-For more customizable scenes, 3D models made in other programs can be imported and rendered through the `.obj` file format. To handle this, this project uses [tinyobjloader](https://github.com/tinyobjloader/tinyobjloader), the files for which can be found in `src/tinyobj`. The program doesn't any pre-rendering input assembly in order to optimize GPU memory usage: both the vertex position data and triangle index buffers are pushed to the GPU exactly as they are read in.
-
-### Custom Normal Buffers
-
-The renderer also supports passing in custom vertex normals, which have no input assembly and are also accessed via a separate set of normal indices. The normals are interpolated with barycentric coordinates, allowing us to use models with smooth shading.
-
-
-## Acceleration Structures
-
-For triangle meshes and imported models, naive intersection testing consists of iterating and testing every triangle. While this is fine for small models, larger models can have upwards of 500K triangles, and this quickly becomes unsatisfiable. Efficient ray tracing relies on spatial acceleration structures to quickly eliminate large portions of the scene from intersection testing. This project implements a [Bounding Volume Hierarchy (BVH)](https://en.wikipedia.org/wiki/Bounding_volume_hierarchy) to achieve logarithmic traversal performance relative to the number of triangles. 
-
-### Bounding Volume Hierarchy
-
-The BVH organizes the geometry into a tree, where each leaf node represents a single triangle of our original mesh, and every other node is a axis-aligned bounding box (AABB) that encapsulates all of its children nodes. 
-
-#### Construction
-
-The BVH is constructed recursively by partitioning the primitives and sending them over to the left/right children nodes. The tree construction is rather [standard](https://en.wikipedia.org/wiki/Binary_tree), and room for optimization can mainly be found in the partitioning and storage approaches. Originally, we simply partitioned nodes down the center of the range, sending a near-equal amount to the left and right children. This resulted in a complete binary tree, which had optimal tree height. Another benefit to this method was the ability to store the tree is a heap-style array, where a node at index $i$ had children at $2i+1$ and $2i+2$. However, due to the nature of the BVH traversal algorithm, this resulted in a very unoptimal BVH as a whole. This method was eventually replaced with an [SAH](#surface-area-heuristic) based partition.
-
-#### Traversal
-
-During ray traversal, the BVH is explored top-down in a [depth-first search](https://en.wikipedia.org/wiki/Depth-first_search) manner. The goal is to track and find the primitive that is closest to the ray's origin. Ray-AABB intersections are tested first, and only the branches that intersect are recursively visited. Leaf nodes then perform ray-triangle intersection tests. A number of low-hanging fruits can be picked here to promote early branch pruning, detailed in [traversal optimizations](#traversal-optimizations). 
-
-
-### Surface Area Heuristic
-
-The Surface Area Heuristic, or SAH, is a formula that estimates the **cost** of splitting a set of primitives into two child nodes by considering the surface areas of the resulting AABBs and their primitive counts.
-
-$$
-  C = C_{trav} + \frac{A_L}{A_P}N_L C_{L} + \frac{A_R}{A_P}N_R C_{R}
-$$
-- $C$ - total cost of this split
-- $A_L, A_R$ - Surface area of the left and right partitions bounding box
-- $N_L, N_R$ - Number of primitives in the left and right partition
-- $C_L, C_R$ - The cost of traversing left and right children
-
-This equation balances traversal speed against build cost, resulting in efficient hierarchies for complex meshes. Our goal when constructing our BVH is to **minimize** $C$, which would result in an optimal split. 
-
-To compute the SAH, we could loop through every possible split, of which there are $n$ for a single axis. However, since computing the SAH takes $O(n)$, the total BVH construction rumtime would be $O(n^3\log n)$, which is unsatisfiable for large meshes. Therefore, we use a construction optimization called [binning](#binning).
-
-Furthermore, since we construct the tree top-down, it's impractical to compute $C_L$ and $C_R$. Therefore, we omit them from our SAH calculation (including $C_{trav}$ for consistency), and instead use a different [stack height optimization](#stack-height-optimization) to avoid blowing up our tree height.
-
-
-#### Binning
-
-Binning is a way to improve the speed of minimizing the SAH at every level. The naive way to minimize the SAH is to calculate it at the centroid of every primitive, since this represents every possible split that can be made along an axis. Instead of doing this, we instead compute the SAH at constant intervals, allowing us to "bin" the primitives into interavls and precompute the bounding box of each bin. This reduces our SAH calculating runtime to $O(n)$, and our total tree construction time to $O(n^2\log n)$.
-
-
-#### Traversal Optimizations
-
-In our traversal algorithm, there are a number of quick and dirty optimizations we can make that will promote early branch pruning and have a strong impact on performance
-
-- **Min-Distance Termination**  
-If we intersect a bounding box, only traverse down if the intersection distance is closer than the current tracked primitive intersection.
-- **Node Sorting**  
-Sort the child nodes based on their bounding box intersection distances, promoting more min-distance termination
-
-
-### Stack Height Optimization
-
-Earlier, we mentioned that in our SAH calculation, we do not calculate $C_L$ and $C_R$ due to its impracticality and just assume them to be 1. However, this has consequences, as these cost values were the only defense against creating severely unbalanced partitions, where one child tree has a much larger height than the other.
-
-In order to defend against this, we can use a default case, where if the split point is in the top or bottom 15% of the range, we default to using a midpoint split. This is a quick and dirty solution to this problem, but it provides a good enough result for this project's needs. We can compute a midpoint split on our axis by performing a partition about the $\frac{n}{2}$th statistic. 
-
-This will guarantee that our tree height is no more than $\log _\frac{1}{1 - 0.15} n$, or $\log _{1.176} n$. For 2.5M triangles, this means our tree height is guarateed to be no more than 100. This is extremely important, because it allows us to create a constant-sized stack class (`src/stack.cu`) that will be stored in VPGRs rather than some paged memory module, creating noticeable performance gains.
-
-
-## Rendering Pipeline Improvements
-
-This project implements several optimizations to improve GPU path tracing throughput and memory coherence. Two key techniques help minimize warp divergence and balance computational load across threads.
-
-### Terminated Path Partitioning
-
-In a naive path tracer, all path segments are processed each iteration, even those that have already terminated (e.g., after hitting a light or not intersecting anything). This wastes GPU lanes and reduces overall efficiency.
-
-**Terminated path partitioning** uses a parallel compaction step via Thrust to partition all active rays to appear before our dead rays in our path data structure. This allows us to reduce the number of blocks we push to the work queue each bounce iteration. This ensures that subsequent kernel launches only operate on active rays, improving occupancy and reducing divergence.
-
-
-### Material Sorting
-
-When shading, different materials (Lambertian, Specular, Cook-Torrance, etc.) often follow distinct code paths, which can cause warp divergence in CUDA. **Material Sorting** groups path segments by their material type before shading, so threads within a warp execute similar instructions. *This has noticable performance in scenes with lots of materials and BRDFs, but since we currently only have a few different materials, the performance impact is shadowed by the sorting overhead. This is a scale-focused solution.*
-
-
-<br/>
+| Flag | Description |
+|---|---|
+| `SCENEFILE` | `.glb` scene (or legacy `.json`) |
+| `-e`, `--envmap` | HDRI environment map (`.exr`) |
+| `-i`, `--iterations` | Samples per pixel; the image is saved and the program exits when reached (default `5000`) |
+| `-o`, `--output` | Output path without extension (default `img/<scene>.<timestamp>.<spp>samp`) |
+| `-dmis` | Direct light sampling with MIS (requires emissive geometry) |
+| `-emis` | Environment map importance sampling with MIS (requires `-e`) |
+| `-lock` | Start with the camera and settings locked |
+
+### Example
+```
+luxion scenes/interior_apartment.glb -e scenes/exr/citrus_orchard_road_puresky_4k.exr -i 5000 -o img/best/interior_apartment -emis -lock
+```
+
+`run_best_scenes.ps1` batch-renders every line of `best_scenes.txt` with `build/bin/luxion.exe`.
+
+### Controls
+
+| Input | Action |
+|---|---|
+| `W` `A` `S` `D` | Move forward / left / back / right |
+| `E` / `Q` | Move up / down |
+| Arrow keys | Orbit around the focus point |
+| Left drag | Orbit |
+| Shift + left drag, middle drag | Pan |
+| Right drag, scroll | Zoom |
+| `Space` | Reset camera |
+| `I` | Save image |
+| `H` | Toggle UI |
+| `Esc` | Save image and quit |
+
+
+## Performance
+
+// Performance Graphs
+
+## Building
+
+### Requirements
+
+- Windows 10/11 with Microsoft Visual Studio 2022
+- [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) 13.x
+- [OptiX SDK](https://developer.nvidia.com/designworks/optix/download) 9.1
+- CMake 3.24+
+- An NVIDIA RTX GPU
+- [Git LFS](https://git-lfs.com/) for large scenes in `scenes/lfs/` (optional)
+
+### Setup
+
+1. Clone with LFS:
+   ```
+   git lfs install
+   git clone https://github.com/seabiscuit-iv/luxion.git
+   ```
+2. Point the `OPTIX_SDK` environment variable at your OptiX install so CMake can find `optix.h`:
+   ```
+   setx OPTIX_SDK "C:\ProgramData\NVIDIA Corporation\OptiX SDK 9.1.0"
+   ```
+### Build
+
+```
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+```
+
+The executable is written to `build/bin/luxion.exe`. It must be run from the repository root, since the OptiX shaders are loaded from `src/optixshaders/` at runtime.
+
+### Compile-time Options
+
+Set in [`include/config.h`](include/config.h):
+
+| Flag | Description |
+|---|---|
+| `OPTIX` | OptiX hardware tracing (`1`) or the software BVH (`0`) |
+| `STREAM_COMPACTION` | Compact terminated paths between bounces |
+| `RAY_SORTING` | Morton-sort the path queue before tracing |
+| `PROFILE` | CUDA event timing, plus the Stage Timings and GPU Utilization windows |
+| `UBER_SHADER` | Single Cook-Torrance shader (`1`) or the legacy per-material shaders (`0`) |
+| `RUSSIAN_ROULETTE_MIN_DEPTH` | First bounce at which Russian roulette can terminate paths |
+
+## Additional Renders
+
+// Any additional renders
+
+## Roadmap
+
+// Where from here
+
+## Acknowledgements
+
+// CIS 5650
+// Models
+// Referenced Papers, etc
