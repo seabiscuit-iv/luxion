@@ -61,7 +61,9 @@ Our fresnel is computed through **Schlick Fresnel approximation** and **IOR-base
 
 Supported textures are base color, normal, metallic-roughness, and emission, which spans the set of all material parameters apart from transmission.
 
-// image: material showcase (rough -> smooth, dielectric -> metal, glass)
+<p align="center">
+  <img src="img/material_preview.png" alt="Material preview" width="100%">
+</p>
 
 ### Importance Sampling
 
@@ -69,7 +71,32 @@ Supported textures are base color, normal, metallic-roughness, and emission, whi
 - **HDRI environment importance sampling:** The environment map is turned into a 2D distribution: a marginal CDF over rows and a conditional CDF per row, weighted by each pixel's brightness and $\sin \theta$. 
 - Both are combined with BSDF sampling using **MIS** and the power heuristic.
 
-// image: naive vs NEE vs NEE + MIS at equal sample count
+<table align="center">
+  <tr>
+    <td align="center" width="50%">
+      <img src="img/breakfast_room_no_mis.png" alt="Breakfast room without MIS" width="100%"><br>
+      <em>Without NEE</em>
+    </td>
+    <td align="center" width="50%">
+      <img src="img/breakfast_room_with_mis.png" alt="Breakfast room with MIS" width="100%"><br>
+      <em>With NEE</em>
+    </td>
+  </tr>
+</table>
+
+
+<table align="center">
+  <tr>
+    <td align="center" width="50%">
+      <img src="img/tank_no_mis.png" alt="Breakfast room without MIS" width="100%"><br>
+      <em>Without environment importance sampling</em>
+    </td>
+    <td align="center" width="50%">
+      <img src="img/tank_with_mis.png" alt="Breakfast room with MIS" width="100%"><br>
+      <em>With environment importance sampling</em>
+    </td>
+  </tr>
+</table>
 
 ### Optimizations
 
@@ -79,8 +106,6 @@ Supported textures are base color, normal, metallic-roughness, and emission, whi
   - Survivors are pushed with a warp-aggregated `atomicAdd`.
   - Later bounces only launch threads for live paths.
 - **Caching Thrust allocator:** temporary buffers are reused across calls instead of reallocating.
-
-// graph: frame time per bounce with / without compaction
 
 ### Scene Loading
 
@@ -146,7 +171,7 @@ luxion scenes/interior_apartment.glb -e scenes/exr/citrus_orchard_road_puresky_4
 
 ## Performance
 
-// Performance Graphs
+// TODO
 
 ## Building
 
@@ -194,14 +219,12 @@ Set in [`include/config.h`](include/config.h):
 
 ## Additional Renders
 
-// Any additional renders
+// TODO
 
 ## Roadmap
 
-// Where from here
+// TODO
 
 ## Acknowledgements
 
-// CIS 5650
-// Models
-// Referenced Papers, etc
+// TODO
