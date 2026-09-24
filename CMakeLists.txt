@@ -138,6 +138,14 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     ${CUDAToolkit_INCLUDE_DIRS}
 )
 
+list(GET CUDAToolkit_INCLUDE_DIRS 0 LUXION_CUDA_INC)
+
+target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
+    LUXION_OPTIX_INCLUDE="${OptiX_INCLUDE}"
+    LUXION_EXTERNAL_INCLUDE="${CMAKE_SOURCE_DIR}/external/include"
+    LUXION_CUDA_INCLUDE="${LUXION_CUDA_INC}"
+)
+
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE 
     ${GL_LIBRARIES}
     fmt::fmt
