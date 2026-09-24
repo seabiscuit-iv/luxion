@@ -3,4 +3,4 @@ scenes/interior_apartment_2.glb -e scenes/exr/citrus_orchard_road_puresky_4k.exr
 scenes/interior_apartment.glb -e scenes/exr/citrus_orchard_road_puresky_4k.exr -i 5000 -o img/best/interior_apartment -emis -lock
 scenes/living_room_interior.glb -e scenes/exr/citrus_orchard_road_puresky_4k.exr -i 5000 -o img/best/living_room_interior -emis -lock
 scenes/living_room_kitchen.glb -e scenes/exr/citrus_orchard_road_puresky_4k.exr -i 5000 -o img/best/living_room_kitchen -emis -lock
-scenes/walkman.glb -e scenes/exr/brown_photostudio_01_4k.exr -i 5000 -o img/best/walkman -emis -lock
+scenes/lfs/walkman.glb -e scenes/exr/brown_photostudio_01_4k.exr -i 5000 -o img/best/walkman -emis -lock
